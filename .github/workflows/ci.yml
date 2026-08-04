@@ -1,0 +1,57 @@
+name: KasaFund CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Mobile, API and web checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://127.0.0.1:27017/kasafund_ci
+      JWT_SECRET: ci-only-secret-not-used-outside-github-actions
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check mobile TypeScript
+        run: npx tsc --noEmit
+
+      - name: Lint mobile app
+        run: npm run lint
+
+      - name: Check API syntax
+        run: npm run check --workspace=kasafund-server
+
+      - name: Test API
+        run: npm test --workspace=kasafund-server
+
+      - name: Check web TypeScript
+        run: npm run check:web
+
+      - name: Build web app
+        run: npm run build:web

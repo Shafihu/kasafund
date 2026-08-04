@@ -1,5 +1,7 @@
 # KasaFund
 
+[![KasaFund CI](https://github.com/Shafihu/kasafund/actions/workflows/ci.yml/badge.svg)](https://github.com/Shafihu/kasafund/actions/workflows/ci.yml)
+
 KasaFund is a community finance product for susu groups, personal savings, and fundraising. This repository is an npm-workspace monorepo containing:
 
 ```text
