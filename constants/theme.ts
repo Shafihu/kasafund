@@ -27,6 +27,25 @@ export const Colors = {
   },
 };
 
+export const SusuColors = {
+  primary: '#0B3D2E',
+  primaryDark: '#072820',
+  navy: '#0D2137',
+  navyLight: '#1A365D',
+  accentGold: '#D4A853',
+  accentCoral: '#E07A5F',
+  background: '#F5F7FA',
+  surface: '#FFFFFF',
+  textPrimary: '#1A2E35',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+  border: '#E2E8F0',
+  statusPaid: '#2D6A4F',
+  statusPending: '#F4A261',
+  statusLate: '#E63946',
+  walletGradient: ['#0B3D2E', '#134E4A', '#0D2137'] as const,
+};
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

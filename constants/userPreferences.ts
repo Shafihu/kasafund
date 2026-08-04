@@ -1,0 +1,27 @@
+import type { UserPreferences } from "@/services/apiService";
+
+export const DEFAULT_USER_PREFERENCES: UserPreferences = {
+  notifications: true,
+  darkMode: false,
+  biometricLogin: false,
+  analytics: true,
+  autoBackup: true,
+  locationServices: false,
+  language: "en",
+  country: "GH",
+  currency: "GHS",
+  hideWalletBalance: false,
+  gamifiedSavings: false,
+  contributionReminders: true,
+  payoutNotifications: true,
+  groupInviteNotifications: true,
+  campaignNotifications: true,
+  donationNotifications: true,
+  anonymousDonationsByDefault: false,
+  allowGroupInvites: true,
+  publicProfile: true,
+  showProfileBio: true,
+  showSharedGroups: true,
+  showOnLeaderboard: true,
+  onboardingCompleted: true,
+};

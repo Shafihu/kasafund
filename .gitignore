@@ -30,14 +30,24 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# Local environment files. Commit only sanitized templates.
+.env
+.env.*
+!.env.example
+!**/.env.example
 
 # typescript
 *.tsbuildinfo
+
+# test coverage
+coverage/
 
 app-example
 
 # generated native folders
 /ios
 /android
+
+requirements.md
+claude.md
+agents.md
