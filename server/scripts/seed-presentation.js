@@ -289,7 +289,20 @@ function buildCampaigns() {
 }
 
 async function clearPresentationData() {
-  const seededUsers = [...Object.values(userIds), adminId];
+  const presentationEmails = [
+    ...people.map(([key]) => `${key}@demo.kasafund.app`),
+    "admin@demo.kasafund.app",
+  ];
+  const existingPresentationUsers = await User.find({
+    email: { $in: presentationEmails },
+  }).select("_id").lean();
+  const seededUsers = [
+    ...new Set([
+      ...Object.values(userIds).map(String),
+      String(adminId),
+      ...existingPresentationUsers.map((user) => String(user._id)),
+    ]),
+  ].map((userId) => new mongoose.Types.ObjectId(userId));
   const seededGroups = Object.values(groupIds);
   const seededCampaigns = Object.values(campaignIds);
   await Promise.all([
