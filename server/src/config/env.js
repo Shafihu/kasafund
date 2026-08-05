@@ -54,6 +54,9 @@ export const env = Object.freeze({
     process.env.DIDIT_CALLBACK_URL || "kasafund://profile/identity-verification",
   resendApiKey: process.env.RESEND_API_KEY || "",
   emailFrom: process.env.EMAIL_FROM || "",
+  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || "",
+  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",
+  twilioVerifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID || "",
   googleClientIds: (process.env.GOOGLE_CLIENT_IDS || "")
     .split(",")
     .map((clientId) => clientId.trim())

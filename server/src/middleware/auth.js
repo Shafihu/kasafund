@@ -36,6 +36,15 @@ export function requireSuperAdmin(req, res, next) {
   });
 }
 
+export function requireVerifiedEmail(req, res, next) {
+  if (req.user?.isEmailVerified || req.user?.emailVerified) return next();
+  return res.status(403).json({
+    success: false,
+    code: "EMAIL_VERIFICATION_REQUIRED",
+    message: "Verify your email before adding a phone number",
+  });
+}
+
 export function requireKyc(req, res, next) {
   if (!req.user?.isEmailVerified && !req.user?.emailVerified) {
     return res.status(403).json({

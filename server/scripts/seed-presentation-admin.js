@@ -37,6 +37,8 @@ async function seedPresentationAdmin() {
     existing.isActive = true;
     existing.isEmailVerified = true;
     existing.emailVerified = true;
+    existing.isPhoneVerified = true;
+    existing.phoneVerifiedAt ||= new Date();
     await existing.save();
   } else {
     await User.create({
@@ -49,6 +51,7 @@ async function seedPresentationAdmin() {
       emailVerified: true,
       isPhoneVerified: true,
       emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
       identityVerification: {
         provider: "didit",
         status: "verified",

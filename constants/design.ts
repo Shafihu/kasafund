@@ -9,6 +9,7 @@ export const kasaColors = {
   border: "#E2E9E6",
   text: "#12211C",
   textMuted: "#64736E",
+  textSubtle: "#9AA8A3",
   success: "#147D64",
   successSoft: "#E5F5EF",
   warning: "#9B6617",

@@ -110,6 +110,12 @@ const userSchema = new mongoose.Schema(
     isEmailVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
+    phoneVerifiedAt: { type: Date, default: null },
+    pendingPhone: { type: String, default: "", select: false },
+    phoneVerificationCodeHash: { type: String, default: "", select: false },
+    phoneVerificationExpiresAt: { type: Date, default: null, select: false },
+    phoneVerificationSentAt: { type: Date, default: null, select: false },
+    phoneVerificationAttempts: { type: Number, default: 0, select: false },
     emailVerifiedAt: { type: Date, default: null },
     emailVerificationCodeHash: { type: String, default: "", select: false },
     emailVerificationExpiresAt: { type: Date, default: null, select: false },
@@ -145,6 +151,11 @@ userSchema.set("toJSON", {
     delete result.emailVerificationExpiresAt;
     delete result.emailVerificationSentAt;
     delete result.emailVerificationAttempts;
+    delete result.pendingPhone;
+    delete result.phoneVerificationCodeHash;
+    delete result.phoneVerificationExpiresAt;
+    delete result.phoneVerificationSentAt;
+    delete result.phoneVerificationAttempts;
     delete result.profileImage;
     if (result.identityVerification) {
       delete result.identityVerification.sessionId;

@@ -363,7 +363,7 @@ async function seed() {
       phone: `+23320000${String(index + 101).padStart(3, "0")}`, passwordHash,
       avatarUrl: `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(fullName)}&size=300`,
       bio, role: "user", isEmailVerified: true, emailVerified: true, isPhoneVerified: true,
-      emailVerifiedAt: days(-420 + index), walletBalance,
+      emailVerifiedAt: days(-420 + index), phoneVerifiedAt: days(-410 + index), walletBalance,
       preferences: { country: "GH", currency: "GHS", onboardingCompleted: true, publicProfile: true, showOnLeaderboard: true },
       identityVerification: {
         provider: "didit",
@@ -389,6 +389,7 @@ async function seed() {
     emailVerified: true,
     isPhoneVerified: true,
     emailVerifiedAt: days(-500),
+    phoneVerifiedAt: days(-495),
     identityVerification: {
       provider: "didit",
       status: "verified",

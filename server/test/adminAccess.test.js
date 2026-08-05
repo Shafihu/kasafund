@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { requireSuperAdmin } from "../src/middleware/auth.js";
+import { requireSuperAdmin, requireVerifiedEmail } from "../src/middleware/auth.js";
 import {
   campaignModerationTransition,
   getAdminCampaign,
@@ -31,6 +31,15 @@ test("requireSuperAdmin rejects a regular member", () => {
   requireSuperAdmin({ user: { role: "user" } }, response, () => assert.fail("next should not run"));
   assert.equal(response.statusCode, 403);
   assert.equal(response.body.code, "ADMIN_ACCESS_REQUIRED");
+});
+
+test("phone verification requires a verified email", () => {
+  const response = responseRecorder();
+  requireVerifiedEmail({ user: { isEmailVerified: false } }, response, () => {
+    assert.fail("next should not run");
+  });
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.code, "EMAIL_VERIFICATION_REQUIRED");
 });
 
 test("group inspection rejects an invalid identifier before querying", async () => {

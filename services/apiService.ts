@@ -111,6 +111,15 @@ export interface AuthResponse {
   success: boolean;
 }
 
+export interface PhoneVerificationChallenge {
+  delivery: "sms" | "development";
+  phoneLast4: string;
+  maskedPhone: string;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+  devCode?: string;
+}
+
 export interface WhatsAppLinkStatus {
   linked: boolean;
   phoneLast4: string;
@@ -1067,6 +1076,36 @@ class ApiService {
     data?: { emailVerification?: AuthResponse["data"]["emailVerification"] };
   }> {
     return await this.makeRequest("/auth/email/resend", { method: "POST" });
+  }
+
+  async startPhoneVerification(phoneNumber: string): Promise<{
+    success: boolean;
+    message: string;
+    data: { phoneVerification: PhoneVerificationChallenge };
+  }> {
+    return await this.makeRequest("/auth/phone/start", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber }),
+    });
+  }
+
+  async resendPhoneVerification(): Promise<{
+    success: boolean;
+    message: string;
+    data: { phoneVerification: PhoneVerificationChallenge };
+  }> {
+    return await this.makeRequest("/auth/phone/resend", { method: "POST" });
+  }
+
+  async verifyPhoneNumber(code: string): Promise<{
+    success: boolean;
+    message: string;
+    data: { user: ApiUser };
+  }> {
+    return await this.makeRequest("/auth/phone/verify", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
   }
 
   async logout(): Promise<void> {

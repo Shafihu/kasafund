@@ -44,6 +44,22 @@ Replace every example value before connecting payment, email, KYC, cloud,
 WhatsApp, or AI providers. Restrict `CORS_ORIGIN` to the deployed web origin in
 production.
 
+### Twilio phone verification
+
+KasaFund uses Twilio Verify for phone-number OTPs. Create a Verify Service in
+Twilio, then configure these private server variables:
+
+```env
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_VERIFY_SERVICE_SID=VA...
+```
+
+Never put these values in an `EXPO_PUBLIC_` variable. When Twilio is not
+configured outside production, the API returns a temporary presentation code
+to the phone verification screen. Production refuses to issue codes until
+Twilio is configured.
+
 ## Run locally
 
 Start the API:

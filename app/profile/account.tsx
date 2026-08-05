@@ -36,14 +36,12 @@ export default function AccountSettingsScreen() {
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const checkAuthStatus = useAuthStore((state) => state.checkAuthStatus);
   const [fullName, setFullName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     setFullName(user?.fullName || "");
-    setPhoneNumber(user?.phoneNumber || "");
     setBio(user?.bio || "");
   }, [user]);
 
@@ -56,7 +54,6 @@ export default function AccountSettingsScreen() {
     try {
       await updateProfile({
         fullName: fullName.trim(),
-        phoneNumber: phoneNumber.trim(),
         bio: bio.trim(),
       });
       Alert.alert("Profile updated", "Your account details were saved.");
@@ -163,6 +160,31 @@ export default function AccountSettingsScreen() {
 
           <TouchableOpacity
             activeOpacity={0.75}
+            onPress={() => router.push("/profile/phone-verification")}
+            style={styles.securityRow}
+          >
+            <View style={styles.verificationIcon}>
+              <Ionicons
+                color={user?.isPhoneVerified ? COLORS.success : "#B7791F"}
+                name={user?.isPhoneVerified ? "phone-portrait" : "phone-portrait-outline"}
+                size={21}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.verificationTitle}>Phone number</Text>
+              <Text style={styles.verificationText}>
+                {user?.isPhoneVerified && user.phoneNumber
+                  ? `${user.phoneNumber} · Verified`
+                  : user?.phoneNumber
+                    ? `${user.phoneNumber} · Verification required`
+                    : "Add and verify a number for account security"}
+              </Text>
+            </View>
+            <Ionicons color={COLORS.textMuted} name="chevron-forward" size={19} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
             onPress={() => router.push("/profile/identity-verification")}
             style={styles.securityRow}
           >
@@ -199,10 +221,6 @@ export default function AccountSettingsScreen() {
             <View>
               <Text style={styles.label}>Full name</Text>
               <TextInput autoCapitalize="words" onChangeText={setFullName} placeholder="Your full name" placeholderTextColor="#9AA8A3" style={styles.input} value={fullName} />
-            </View>
-            <View>
-              <Text style={styles.label}>Phone number</Text>
-              <TextInput keyboardType="phone-pad" onChangeText={setPhoneNumber} placeholder="e.g. 024 000 0000" placeholderTextColor="#9AA8A3" style={styles.input} value={phoneNumber} />
             </View>
             <View>
               <Text style={styles.label}>Profile bio</Text>
