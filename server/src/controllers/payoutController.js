@@ -17,6 +17,12 @@ export async function schedulePayout(req, res) {
   if (!(await canManage(req.params.groupId, req.user._id))) return res.status(403).json({ success: false, message: "Owner or treasurer permission required" });
   const group = await Group.findById(req.params.groupId);
   if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+  if (group.savingModel === "collective_goal") {
+    return res.status(409).json({
+      success: false,
+      message: "Collective-goal payouts must be proposed and approved by member vote",
+    });
+  }
   const recipient = await GroupMember.findOne({ groupId: group._id, userId: req.body.recipientId, status: "active" });
   if (!recipient) return res.status(400).json({ success: false, message: "Recipient must be an active member" });
   if ((group.rotation.completedRecipientIds || []).some(

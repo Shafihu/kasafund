@@ -21,6 +21,7 @@ export interface User {
   notificationPrefs?: ApiUser["notificationPrefs"];
   preferences?: UserPreferences;
   identityVerification?: ApiUser["identityVerification"];
+  payoutMethod?: ApiUser["payoutMethod"];
 }
 
 const mapApiUser = (user: ApiUser): User => ({
@@ -37,6 +38,7 @@ const mapApiUser = (user: ApiUser): User => ({
   notificationPrefs: user.notificationPrefs,
   preferences: user.preferences,
   identityVerification: user.identityVerification,
+  payoutMethod: user.payoutMethod,
 });
 
 export interface AuthState {

@@ -82,6 +82,10 @@ type GroupDetailData = {
   id?: string;
   name: string;
   type: string;
+  savingModel?: ApiGroupDetail["group"]["savingModel"];
+  collectiveGoal?: ApiGroupDetail["group"]["collectiveGoal"];
+  collectiveProposal?: ApiGroupDetail["currentCollectiveProposal"];
+  collectivePayouts?: ApiGroupDetail["collectivePayoutProposals"];
   coverColor: string;
   coverImageUrl?: string;
   potAmount: string;
@@ -235,11 +239,17 @@ function mapGroupDetail(data: ApiGroupDetail): GroupDetailData {
     id: group._id,
     name: group.name,
     type: `${group.type} · ${group.contribution.frequency}`,
+    savingModel: group.savingModel || "rotational",
+    collectiveGoal: group.collectiveGoal,
+    collectiveProposal: data.currentCollectiveProposal,
+    collectivePayouts: data.collectivePayoutProposals || [],
     coverColor,
     coverImageUrl: group.coverImageUrl,
     potAmount: formatMoney(group.totalPot),
-    goalAmount: formatMoney(target),
-    progress: target ? Math.min(group.totalPot / target, 1) : 0,
+    goalAmount: formatMoney(group.collectiveGoal?.targetAmount || target),
+    progress: group.collectiveGoal?.targetAmount
+      ? Math.min(group.collectiveGoal.totalSaved / group.collectiveGoal.targetAmount, 1)
+      : target ? Math.min(group.totalPot / target, 1) : 0,
     nextPayoutDate: formatDate(nextPayout?.scheduledDate),
     nextPayoutMember: nextPayout?.recipientId?.fullName || "Not assigned",
     payoutReadiness: data.currentPayoutReadiness,
@@ -726,6 +736,7 @@ function OverviewTab({
   onVote,
   onActivate,
   onInvite,
+  onOpenCollectivePayout,
   financialAction,
 }: {
   group: GroupDetailData;
@@ -738,6 +749,7 @@ function OverviewTab({
   onVote: (choice: "approve" | "reject") => void;
   onActivate: () => void;
   onInvite: () => void;
+  onOpenCollectivePayout: () => void;
   financialAction: GroupFinancialAction;
 }) {
   const readiness = group.payoutReadiness;
@@ -802,7 +814,9 @@ function OverviewTab({
             />
           </View>
           <Text style={styles.setupBody}>
-            No contributions or payouts begin until the owner confirms the accepted roster and payout order.
+            {group.savingModel === "collective_goal"
+              ? "No contributions begin until the owner confirms the accepted roster and shared-goal rules."
+              : "No contributions or payouts begin until the owner confirms the accepted roster and payout order."}
           </Text>
           {isOwner && (
             <TouchableOpacity
@@ -839,7 +853,44 @@ function OverviewTab({
         </KasaCard>
       </View>
 
-      {group.status !== "setup" && <KasaCard style={[styles.nextPayoutCard, { backgroundColor: payoutStatus.background }]}> 
+      {group.savingModel === "collective_goal" && group.status !== "setup" ? (
+        <KasaCard style={styles.collectiveGoalCard}>
+          <View style={styles.collectiveGoalHeader}>
+            <View style={styles.collectiveGoalIcon}>
+              <Ionicons name={group.collectiveGoal?.status === "saving" ? "flag-outline" : "checkmark-circle-outline"} size={21} color={COLORS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.collectiveGoalEyebrow}>COLLECTIVE GOAL</Text>
+              <Text style={styles.collectiveGoalTitle}>
+                {group.collectiveGoal?.status === "saving" ? "Saving together" : group.collectiveGoal?.status === "target_reached" ? "Goal reached · decision ready" : "Goal completed"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.collectiveMoneyRow}>
+            <Text style={styles.collectiveSaved}>{formatMoney(group.collectiveGoal?.totalSaved || 0)}</Text>
+            <Text style={styles.collectiveTarget}> of {group.goalAmount}</Text>
+          </View>
+          <View style={styles.collectiveTrack}><View style={[styles.collectiveFill, { width: `${group.progress * 100}%` }]} /></View>
+          <Text style={styles.collectiveAvailable}>{group.potAmount} currently available for an approved payout</Text>
+          {group.collectiveProposal ? (
+            <View style={styles.collectiveVoteSummary}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.collectiveVoteTitle}>Payout vote is open</Text>
+                <Text style={styles.collectiveVoteBody}>{group.collectiveProposal.yesVotes} of {group.collectiveProposal.requiredYesVotes} approvals · {formatMoney(group.collectiveProposal.amount)}</Text>
+              </View>
+              {group.collectiveProposal.canVote ? <View style={styles.voteNeededBadge}><Text style={styles.voteNeededText}>Your vote</Text></View> : null}
+            </View>
+          ) : null}
+          {group.collectiveGoal?.status !== "completed" ? (
+            <TouchableOpacity accessibilityRole="button" activeOpacity={0.82} onPress={onOpenCollectivePayout} style={styles.collectiveAction}>
+              <Text style={styles.collectiveActionText}>{group.collectiveProposal ? "Review payout vote" : group.collectiveGoal?.status === "target_reached" ? "Manage payout decision" : "View goal details"}</Text>
+              <Ionicons name="arrow-forward" size={17} color={COLORS.background} />
+            </TouchableOpacity>
+          ) : null}
+        </KasaCard>
+      ) : null}
+
+      {group.status !== "setup" && group.savingModel === "rotational" && <KasaCard style={[styles.nextPayoutCard, { backgroundColor: payoutStatus.background }]}>
         <View style={[styles.discoverIconWrap, { borderColor: `${payoutStatus.color}35` }]}>
           <Ionicons name={payoutStatus.icon} size={20} color={payoutStatus.color} />
         </View>
@@ -922,7 +973,7 @@ function OverviewTab({
         </View>
       </KasaCard>}
 
-      {!!resolution && (
+      {!!resolution && group.savingModel === "rotational" && (
         <KasaCard style={styles.resolutionCard}>
           <View style={styles.resolutionHeader}>
             <View style={styles.resolutionIcon}>
@@ -1084,6 +1135,7 @@ function OverviewTab({
 
 function MembersTab({
   members,
+  savingModel,
   canInvite,
   canManageRoles,
   onInvite,
@@ -1091,6 +1143,7 @@ function MembersTab({
   onOpenProfile,
 }: {
   members: MemberRow[];
+  savingModel?: GroupDetailData["savingModel"];
   canInvite: boolean;
   canManageRoles: boolean;
   onInvite: () => void;
@@ -1128,7 +1181,7 @@ function MembersTab({
                     </View>
                   )}
                 </View>
-                <Text style={styles.freqSublabel}>Payout position #{m.payoutPosition}</Text>
+                <Text style={styles.freqSublabel}>{savingModel === "collective_goal" ? "Equal voting member" : `Payout position #${m.payoutPosition}`}</Text>
               </View>
             </TouchableOpacity>
             <StatusPill status={m.status} />
@@ -1251,8 +1304,37 @@ function PayoutsTab({
   );
 }
 
-function SettingsTab({ role, autoContributionEnabled, developmentSimulation, onAutoContribution, onDevelopmentTools, onEdit, onInvite, onManageRoles, onNotifications, onLeave, onArchive }: {
+function CollectiveDecisionsTab({
+  proposals = [],
+  onOpen,
+}: {
+  proposals?: NonNullable<GroupDetailData["collectivePayouts"]>;
+  onOpen: () => void;
+}) {
+  return (
+    <View style={styles.tabContent}>
+      <KasaSectionHeader title="Payout decisions" />
+      {proposals.length ? proposals.map((proposal) => (
+        <TouchableOpacity key={proposal._id} activeOpacity={0.82} onPress={onOpen} style={styles.collectiveHistoryRow}>
+          <View style={[styles.activityIconWrap, { backgroundColor: proposal.status === "paid" ? COLORS.successSurface : proposal.status === "voting" ? "#EFEAFB" : COLORS.surface }]}>
+            <Ionicons name={proposal.status === "paid" ? "checkmark" : proposal.status === "voting" ? "people-outline" : "close-outline"} size={18} color={proposal.status === "paid" ? COLORS.success : proposal.status === "voting" ? "#6D4BC3" : COLORS.textMuted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.freqLabel}>{proposal.purpose}</Text>
+            <Text style={styles.freqSublabel}>{proposal.recipient?.fullName || "Member"} · {proposal.status === "paid" ? "Approved and paid" : proposal.status === "voting" ? "Voting open" : proposal.status}</Text>
+          </View>
+          <Text style={styles.activityAmount}>{formatMoney(proposal.amount)}</Text>
+        </TouchableOpacity>
+      )) : (
+        <KasaStateView icon="people-outline" kind="empty" message="Approved and rejected payout proposals will appear here." title="No payout decisions yet" />
+      )}
+    </View>
+  );
+}
+
+function SettingsTab({ role, savingModel, autoContributionEnabled, developmentSimulation, onAutoContribution, onDevelopmentTools, onEdit, onInvite, onManageRoles, onNotifications, onLeave, onArchive }: {
   role: "owner" | "treasurer" | "moderator" | "member";
+  savingModel?: GroupDetailData["savingModel"];
   autoContributionEnabled: boolean;
   developmentSimulation?: ApiGroupDetail["developmentSimulation"];
   onAutoContribution: () => void;
@@ -1295,11 +1377,11 @@ function SettingsTab({ role, autoContributionEnabled, developmentSimulation, onA
               <Text style={[styles.freqLabel, { flex: 1 }]}>Contribution rules & penalties</Text>
               <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsRow} activeOpacity={0.85} onPress={() => onEdit("rotation")}>
+            {savingModel !== "collective_goal" ? <TouchableOpacity style={styles.settingsRow} activeOpacity={0.85} onPress={() => onEdit("rotation")}>
               <Ionicons name="swap-vertical-outline" size={20} color={COLORS.text} />
               <Text style={[styles.freqLabel, { flex: 1 }]}>Payout rotation order</Text>
               <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-            </TouchableOpacity>
+            </TouchableOpacity> : null}
             <TouchableOpacity style={styles.settingsRow} activeOpacity={0.85} onPress={onInvite}>
               <Ionicons name="person-add-outline" size={20} color={COLORS.text} />
               <Text style={[styles.freqLabel, { flex: 1 }]}>Invite members</Text>
@@ -1412,7 +1494,9 @@ function ActivationReviewModal({
             </View>
             <Text style={styles.activationSuccessTitle}>Group activated</Text>
             <Text style={styles.activationSuccessText}>
-              The first payout is scheduled and every accepted member has been notified.
+              {group.savingModel === "collective_goal"
+                ? "Shared-goal contributions are scheduled and every accepted member has been notified."
+                : "The first payout is scheduled and every accepted member has been notified."}
             </Text>
             <KasaButton label="Done" onPress={onClose} style={styles.activationDoneButton} />
           </View>
@@ -1423,7 +1507,9 @@ function ActivationReviewModal({
                 <Text style={styles.activationEyebrow}>FINAL CHECK</Text>
                 <Text style={styles.activationTitle}>Review & activate</Text>
                 <Text style={styles.activationSubtitle}>
-                  Confirm the rules and payout order before the first cycle begins.
+                  {group.savingModel === "collective_goal"
+                    ? "Confirm the roster and shared-goal rules before contributions begin."
+                    : "Confirm the rules and payout order before the first cycle begins."}
                 </Text>
               </View>
               <Pressable
@@ -1466,14 +1552,14 @@ function ActivationReviewModal({
                   <Ionicons name="calendar-outline" size={19} color={COLORS.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.activationRowTitle}>First payout</Text>
+                  <Text style={styles.activationRowTitle}>{group.savingModel === "collective_goal" ? "First contribution" : "First payout"}</Text>
                   <Text style={styles.activationRowText}>{firstPayoutTiming}</Text>
                 </View>
               </View>
 
               <View style={styles.activationSectionHeader}>
-                <Text style={styles.activationSectionTitle}>Payout order</Text>
-                <Pressable
+                <Text style={styles.activationSectionTitle}>{group.savingModel === "collective_goal" ? "Accepted members" : "Payout order"}</Text>
+                {group.savingModel !== "collective_goal" ? <Pressable
                   accessibilityRole="button"
                   hitSlop={8}
                   onPress={onEditOrder}
@@ -1481,7 +1567,7 @@ function ActivationReviewModal({
                 >
                   <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
                   <Text style={styles.activationEditOrderText}>Edit order</Text>
-                </Pressable>
+                </Pressable> : null}
               </View>
               <View style={styles.activationOrderList}>
                 {orderedMembers.map((member, index) => (
@@ -1507,7 +1593,7 @@ function ActivationReviewModal({
                         {member.role === "owner" ? "Group owner" : member.role === "treasurer" ? "Treasurer" : "Member"}
                       </Text>
                     </View>
-                    {index === 0 ? (
+                    {group.savingModel !== "collective_goal" && index === 0 ? (
                       <View style={styles.activationFirstBadge}>
                         <Text style={styles.activationFirstBadgeText}>First payout</Text>
                       </View>
@@ -1519,7 +1605,9 @@ function ActivationReviewModal({
               <View style={styles.activationNotice}>
                 <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
                 <Text style={styles.activationNoticeText}>
-                  Activating creates the first cycle. The payout order stays locked until that round finishes.
+                  {group.savingModel === "collective_goal"
+                    ? "Activating starts scheduled contributions. Funds remain locked until the goal is reached and a majority approves a payout."
+                    : "Activating creates the first cycle. The payout order stays locked until that round finishes."}
                 </Text>
               </View>
 
@@ -1973,7 +2061,7 @@ export default function GroupDetailScreen() {
     { key: "overview", label: "Overview" },
     { key: "members", label: "Members" },
     { key: "contributions", label: "Contributions" },
-    { key: "payouts", label: "Payouts" },
+    { key: "payouts", label: group.savingModel === "collective_goal" ? "Decisions" : "Payouts" },
     { key: "settings", label: "Settings" },
   ];
 
@@ -1994,7 +2082,7 @@ export default function GroupDetailScreen() {
             <Ionicons name="arrow-back" size={22} color={COLORS.background} />
           </Pressable>
           <View style={styles.heroActions}>
-            {isMember && (
+            {isMember && group.savingModel !== "collective_goal" && (
               <Pressable
                 accessibilityLabel="Open cycle ledger"
                 accessibilityRole="button"
@@ -2049,7 +2137,7 @@ export default function GroupDetailScreen() {
           <ProgressRing progress={group.progress} />
         </View>
 
-        {group.status === "active" && <KasaButton
+        {group.status === "active" && (group.savingModel !== "collective_goal" || group.collectiveGoal?.status === "saving") && <KasaButton
           label="Make a contribution"
           leftIcon={<Ionicons name="add-circle" size={18} color={COLORS.primary} />}
           onPress={() =>
@@ -2107,11 +2195,13 @@ export default function GroupDetailScreen() {
             onVote={voteOnResolution}
             onActivate={activateGroup}
             onInvite={() => setInviteModalVisible(true)}
+            onOpenCollectivePayout={() => router.push({ pathname: "/groups/[id]/collective-payout", params: { id } })}
           />
         )}
         {activeTab === "members" && (
           <MembersTab
             members={group.members}
+            savingModel={group.savingModel}
             canInvite={membershipRole === "owner" || membershipRole === "treasurer"}
             canManageRoles={membershipRole === "owner"}
             onInvite={() => setInviteModalVisible(true)}
@@ -2124,7 +2214,9 @@ export default function GroupDetailScreen() {
         {activeTab === "contributions" && (
           <ContributionsTab contributions={group.contributions} groupStatus={group.status} />
         )}
-        {activeTab === "payouts" && <PayoutsTab payouts={group.payouts} groupStatus={group.status} />}
+        {activeTab === "payouts" && (group.savingModel === "collective_goal"
+          ? <CollectiveDecisionsTab proposals={group.collectivePayouts} onOpen={() => router.push({ pathname: "/groups/[id]/collective-payout", params: { id } })} />
+          : <PayoutsTab payouts={group.payouts} groupStatus={group.status} />)}
         {activeTab === "settings" && (
           <SettingsTab
             autoContributionEnabled={autoContribution.enabled}
@@ -2138,6 +2230,7 @@ export default function GroupDetailScreen() {
             onManageRoles={() => setActiveTab("members")}
             onNotifications={() => router.push("/notifications_modal")}
             role={membershipRole}
+            savingModel={group.savingModel}
           />
         )}
       </ScrollView>
@@ -2488,6 +2581,24 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginBottom: 24,
   },
+  collectiveGoalCard: { backgroundColor: "#F3F8F5", borderColor: "#D3E5DC", borderWidth: 1, padding: 16 },
+  collectiveGoalHeader: { alignItems: "center", flexDirection: "row", gap: 10 },
+  collectiveGoalIcon: { alignItems: "center", backgroundColor: COLORS.background, borderRadius: 11, height: 42, justifyContent: "center", width: 42 },
+  collectiveGoalEyebrow: { color: COLORS.primary, fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  collectiveGoalTitle: { color: COLORS.text, fontSize: 15, fontWeight: "800", marginTop: 2 },
+  collectiveMoneyRow: { alignItems: "baseline", flexDirection: "row", marginTop: 18 },
+  collectiveSaved: { color: COLORS.text, fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+  collectiveTarget: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600" },
+  collectiveTrack: { backgroundColor: "#DCE9E3", borderRadius: 999, height: 7, marginTop: 10, overflow: "hidden" },
+  collectiveFill: { backgroundColor: COLORS.primary, borderRadius: 999, height: "100%" },
+  collectiveAvailable: { color: COLORS.textMuted, fontSize: 10, lineHeight: 15, marginTop: 7 },
+  collectiveVoteSummary: { alignItems: "center", backgroundColor: COLORS.background, borderColor: "#D3E5DC", borderRadius: 12, borderWidth: 1, flexDirection: "row", marginTop: 14, padding: 12 },
+  collectiveVoteTitle: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  collectiveVoteBody: { color: COLORS.textMuted, fontSize: 10, marginTop: 3 },
+  voteNeededBadge: { backgroundColor: "#F0EAFB", borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  voteNeededText: { color: "#6D4BC3", fontSize: 9, fontWeight: "800" },
+  collectiveAction: { alignItems: "center", backgroundColor: COLORS.primary, borderRadius: 12, flexDirection: "row", justifyContent: "center", marginTop: 14, paddingVertical: 12 },
+  collectiveActionText: { color: COLORS.background, fontSize: 12, fontWeight: "800", marginRight: 7 },
   discoverIconWrap: {
     width: 40,
     height: 40,
@@ -2710,6 +2821,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  collectiveHistoryRow: { alignItems: "center", backgroundColor: COLORS.background, borderBottomColor: COLORS.border, borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 14 },
   activityHeading: { marginBottom: 12, marginTop: 4 },
   activityEmpty: { minHeight: 180 },
   tabEmptyState: { minHeight: 260 },

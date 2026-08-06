@@ -6,6 +6,7 @@ import { GroupMember } from "../models/GroupMember.js";
 import { Notification } from "../models/Notification.js";
 import { completeContribution } from "./paymentService.js";
 import { ensureNextPayout } from "./payoutScheduleService.js";
+import { scheduledGroupContribution } from "./groupContributionScheduleService.js";
 
 const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -56,8 +57,28 @@ export async function processAutoContribution(memberId, now = new Date()) {
 
   const group = await Group.findOne({ _id: member.groupId, status: "active" });
   if (!group) return { processed: false, reason: "group_unavailable" };
+  if (group.savingModel === "collective_goal" && group.collectiveGoal?.status !== "saving") {
+    await GroupMember.updateOne(
+      { _id: member._id },
+      { $set: { "autoContribution.nextRunAt": null } }
+    );
+    return { processed: false, reason: "goal_reached" };
+  }
 
-  const payout = await ensureNextPayout(group._id);
+  const rotationalPayout = group.savingModel === "collective_goal"
+    ? null
+    : await ensureNextPayout(group._id);
+  const collectiveSchedule = group.savingModel === "collective_goal"
+    ? scheduledGroupContribution(group.contribution, now)
+    : null;
+  const payout = rotationalPayout || (collectiveSchedule
+    ? {
+        cycleNumber: collectiveSchedule.cycleNumber,
+        scheduledDate: collectiveSchedule.dueDate,
+        contributionAmount: group.contribution.amount,
+        expectedContributorIds: [],
+      }
+    : null);
   if (!payout) {
     await GroupMember.updateOne(
       { _id: member._id },
@@ -73,7 +94,7 @@ export async function processAutoContribution(memberId, now = new Date()) {
   ) {
     return { processed: false, reason: "not_in_current_cycle" };
   }
-  if (!payout.snapshotLockedAt) {
+  if (rotationalPayout && !rotationalPayout.snapshotLockedAt) {
     payout.snapshotLockedAt = now;
     await payout.save();
   }

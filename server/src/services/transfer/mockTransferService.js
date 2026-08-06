@@ -32,22 +32,29 @@ function mockTransfer({ reference, transferCode, amount, recipientCode }) {
 export const mockTransferService = Object.freeze({
   mode: "mock",
 
-  async listProviders() {
+  async listProviders(type = "mobile_money") {
     await delay(400);
-    return [
+    return type === "bank" ? [
+      { code: "GCB", name: "GCB Bank" },
+      { code: "ECOBANK", name: "Ecobank Ghana" },
+      { code: "FIDELITY", name: "Fidelity Bank Ghana" },
+      { code: "ABSA", name: "Absa Bank Ghana" },
+      { code: "STANBIC", name: "Stanbic Bank Ghana" },
+    ] : [
       { code: "MTN", name: "MTN" },
       { code: "ATL", name: "AirtelTigo" },
       { code: "VOD", name: "Telecel" },
     ];
   },
 
-  async createRecipient({ accountNumber, providerCode }) {
+  async createRecipient({ name, accountNumber, providerCode }) {
     await delay(400);
     return {
       recipientCode: `RCP_mock_${crypto.randomBytes(8).toString("hex")}`,
       mode: "mock",
       mocked: true,
       note: MOCK_NOTE,
+      accountName: name,
       raw: {
         mocked: true,
         note: MOCK_NOTE,

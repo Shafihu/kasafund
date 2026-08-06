@@ -4,6 +4,8 @@ import {
   createWalletWithdrawal,
   finalizeWalletWithdrawal,
   getPayoutProviders,
+  getPayoutMethod,
+  savePayoutMethod,
   listGroupDebts,
   getWallet,
   initializeWalletDeposit,
@@ -34,6 +36,14 @@ router.post(
   verifyDebtRepayment
 );
 router.get("/wallet/payout-providers", requireAuth, getPayoutProviders);
+router.get("/wallet/payout-method", requireAuth, getPayoutMethod);
+router.put(
+  "/wallet/payout-method",
+  requireAuth,
+  kycAction("set up a payout method"),
+  requireKyc,
+  savePayoutMethod
+);
 router.post("/wallet/deposits", requireAuth, kycAction("add money to your wallet"), requireKyc, initializeWalletDeposit);
 router.post("/wallet/deposits/:reference/verify", requireAuth, verifyWalletDeposit);
 router.post("/wallet/withdrawals", requireAuth, kycAction("withdraw money"), requireKyc, createWalletWithdrawal);

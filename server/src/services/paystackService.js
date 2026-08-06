@@ -63,6 +63,10 @@ export function listGhanaMobileMoneyProviders() {
   return paystackRequest("/bank?currency=GHS&type=mobile_money");
 }
 
+export function listGhanaBanks() {
+  return paystackRequest("/bank?country=ghana&currency=GHS&type=ghipss");
+}
+
 export function createTransferRecipient(payload) {
   return paystackRequest("/transferrecipient", { method: "POST", body: payload });
 }

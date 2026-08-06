@@ -2,13 +2,12 @@ import {
   AnimatedLoader,
   KasaButton,
   KasaCard,
-  KasaChoiceCard,
   KasaMoneyInput,
   KasaPaymentSummary,
   KasaSectionHeader,
 } from "@/components/ui";
 import { kasaColors } from "@/constants/design";
-import { apiService, type PayoutProvider } from "@/services/apiService";
+import { apiService, type PayoutMethod } from "@/services/apiService";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -45,9 +44,7 @@ export default function WithdrawScreen() {
   const checkAuthStatus = useAuthStore((state) => state.checkAuthStatus);
   const balance = user?.walletBalance ?? 0;
   const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState(user?.phoneNumber ?? "");
-  const [providers, setProviders] = useState<PayoutProvider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<PayoutProvider | null>(null);
+  const [payoutMethod, setPayoutMethod] = useState<PayoutMethod | null>(null);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [providerError, setProviderError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -55,8 +52,6 @@ export default function WithdrawScreen() {
   const [otpReference, setOtpReference] = useState("");
 
   const amountInPesewas = parseAmount(amount);
-  const cleanedPhone = phone.replace(/[\s-]/g, "");
-  const validPhone = /^(?:\+233|233|0)\d{9}$/.test(cleanedPhone);
   const amountError = amount.length > 0
     ? !amountInPesewas || amountInPesewas < 100
       ? "Enter at least GH₵ 1.00."
@@ -64,15 +59,11 @@ export default function WithdrawScreen() {
         ? `Your available balance is ${formatMoney(balance)}.`
         : undefined
     : undefined;
-  const phoneError = phone.length > 0 && !validPhone
-    ? "Enter a valid Ghana mobile money number."
-    : undefined;
   const canWithdraw = Boolean(
     amountInPesewas &&
       amountInPesewas >= 100 &&
       amountInPesewas <= balance &&
-      validPhone &&
-      selectedProvider
+      payoutMethod
   );
   const otpValid = /^\d{4,8}$/.test(otp);
 
@@ -80,9 +71,8 @@ export default function WithdrawScreen() {
     setLoadingProviders(true);
     setProviderError("");
     try {
-      const response = await apiService.getPayoutProviders();
-      setProviders(response.data);
-      setSelectedProvider((current) => current ?? response.data[0] ?? null);
+      const response = await apiService.getPayoutMethod();
+      setPayoutMethod(response.data);
     } catch (error) {
       setProviderError(error instanceof Error ? error.message : "Could not load providers");
     } finally {
@@ -95,14 +85,11 @@ export default function WithdrawScreen() {
   }, [loadProviders]);
 
   const withdraw = async () => {
-    if (!canWithdraw || !amountInPesewas || !selectedProvider) return;
+    if (!canWithdraw || !amountInPesewas || !payoutMethod) return;
     setSubmitting(true);
     try {
       const response = await apiService.createWalletWithdrawal({
         amount: amountInPesewas,
-        accountNumber: phone,
-        providerCode: selectedProvider.code,
-        providerName: selectedProvider.name,
       });
       await checkAuthStatus();
       if (response.data.requiresOtp) {
@@ -127,10 +114,10 @@ export default function WithdrawScreen() {
   };
 
   const confirmWithdrawal = () => {
-    if (!amountInPesewas || !selectedProvider) return;
+    if (!amountInPesewas || !payoutMethod) return;
     Alert.alert(
       "Confirm withdrawal",
-      `Send ${formatMoney(amountInPesewas)} to ${selectedProvider.name} ${phone}? Confirm the number is correct before continuing.`,
+      `Send ${formatMoney(amountInPesewas)} to ${payoutMethod.providerName} ending ${payoutMethod.accountLast4}?`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Confirm transfer", onPress: () => void withdraw() },
@@ -224,8 +211,8 @@ export default function WithdrawScreen() {
               </KasaCard>
               <KasaPaymentSummary
                 items={[
-                  { label: "Destination", value: selectedProvider?.name || "Mobile money" },
-                  { label: "Number", value: phone },
+                  { label: "Destination", value: payoutMethod?.providerName || "Payout method" },
+                  { label: "Account", value: payoutMethod ? `•••• ${payoutMethod.accountLast4}` : "—" },
                 ]}
                 style={styles.summaryCard}
                 total={formatMoney(amountInPesewas ?? 0)}
@@ -262,8 +249,8 @@ export default function WithdrawScreen() {
 
               <View style={styles.destinationHeader}>
                 <KasaSectionHeader
-                  description="Select the network registered to the receiving number."
-                  title="Mobile money provider"
+                  description="Your saved destination is used so you do not need to re-enter sensitive details."
+                  title="Payout destination"
                 />
               </View>
               {loadingProviders ? (
@@ -285,49 +272,29 @@ export default function WithdrawScreen() {
                     variant="secondary"
                   />
                 </KasaCard>
+              ) : payoutMethod ? (
+                <KasaCard style={styles.savedMethodCard}>
+                  <View style={styles.savedMethodIcon}>
+                    <Ionicons color={kasaColors.brand} name={payoutMethod.type === "bank" ? "business-outline" : "phone-portrait-outline"} size={21} />
+                  </View>
+                  <View style={styles.providerCopy}>
+                    <Text style={styles.providerText}>{payoutMethod.providerName} •••• {payoutMethod.accountLast4}</Text>
+                    <Text style={styles.providerHint}>{payoutMethod.accountName}</Text>
+                  </View>
+                  <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push("/profile/payout-method")}>
+                    <Text style={styles.changeMethod}>Change</Text>
+                  </Pressable>
+                </KasaCard>
               ) : (
-                <View accessibilityRole="radiogroup" style={styles.providers}>
-                  {providers.map((provider) => {
-                    const selected = selectedProvider?.code === provider.code;
-                    return (
-                      <KasaChoiceCard
-                        accessibilityLabel={provider.name}
-                        key={provider.code}
-                        onPress={() => setSelectedProvider(provider)}
-                        selected={selected}
-                        style={styles.provider}
-                      >
-                        <View style={styles.providerCopy}>
-                          <Text style={styles.providerText}>{provider.name}</Text>
-                          <Text style={styles.providerHint}>Mobile money payout</Text>
-                        </View>
-                        <Ionicons
-                          color={selected ? kasaColors.brand : kasaColors.textMuted}
-                          name={selected ? "radio-button-on" : "radio-button-off"}
-                          size={21}
-                        />
-                      </KasaChoiceCard>
-                    );
-                  })}
-                </View>
+                <KasaCard style={styles.missingMethodCard} variant="soft">
+                  <Ionicons color={kasaColors.brand} name="add-circle-outline" size={22} />
+                  <View style={styles.providerCopy}>
+                    <Text style={styles.providerText}>Add a payout method</Text>
+                    <Text style={styles.providerHint}>Choose mobile money or a bank account before withdrawing.</Text>
+                  </View>
+                  <KasaButton fullWidth={false} label="Set up" onPress={() => router.push("/profile/payout-method")} size="compact" variant="secondary" />
+                </KasaCard>
               )}
-
-              <Text style={styles.fieldLabel}>Mobile money number</Text>
-              <View style={[styles.phoneBox, phoneError && styles.phoneBoxError]}>
-                <Ionicons color={kasaColors.textMuted} name="phone-portrait-outline" size={19} />
-                <TextInput
-                  accessibilityLabel="Receiving mobile money number"
-                  keyboardType="phone-pad"
-                  maxLength={16}
-                  onChangeText={setPhone}
-                  placeholder="e.g. 024 123 4567"
-                  placeholderTextColor="#9AA8A3"
-                  selectionColor={kasaColors.brand}
-                  style={styles.phoneInput}
-                  value={phone}
-                />
-              </View>
-              {phoneError ? <Text style={styles.validationText}>{phoneError}</Text> : null}
 
               <KasaPaymentSummary
                 items={[
@@ -343,7 +310,7 @@ export default function WithdrawScreen() {
               <KasaCard style={styles.notice} variant="soft">
                 <Ionicons color={kasaColors.brand} name="information-circle-outline" size={19} />
                 <Text style={styles.noticeText}>
-                  Confirm the provider and number carefully. Mobile money transfers may not be reversible after submission.
+                  Confirm the destination carefully. Transfers may not be reversible after submission.
                 </Text>
               </KasaCard>
             </>
@@ -393,6 +360,10 @@ const styles = StyleSheet.create({
   providerCopy: { flex: 1 },
   providerText: { color: kasaColors.text, fontSize: 13, fontWeight: "700" },
   providerHint: { color: kasaColors.textMuted, fontSize: 10, marginTop: 3 },
+  savedMethodCard: { alignItems: "center", flexDirection: "row", gap: 11, marginTop: 12 },
+  savedMethodIcon: { alignItems: "center", backgroundColor: kasaColors.brandSoft, borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
+  missingMethodCard: { alignItems: "center", flexDirection: "row", gap: 10, marginTop: 12 },
+  changeMethod: { color: kasaColors.brand, fontSize: 11, fontWeight: "800" },
   errorCard: { alignItems: "center", flexDirection: "row", gap: 10, marginTop: 12 },
   errorCopy: { flex: 1 },
   errorTitle: { color: kasaColors.danger, fontSize: 12, fontWeight: "700" },

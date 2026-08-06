@@ -2,7 +2,7 @@
  * Shared outbound transfer contract.
  *
  * Implementations provide:
- * - listProviders() -> [{ code, name }]
+ * - listProviders(type) -> [{ code, name }]
  * - createRecipient(input) -> { recipientCode, mode, mocked, note, raw }
  * - initiate(input) -> { status, transferCode, reference, mode, mocked, note, message, raw }
  * - verify(reference) -> the same normalized transfer result

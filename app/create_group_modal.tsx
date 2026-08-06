@@ -44,10 +44,11 @@ const COLORS = {
 };
 
 const TOTAL_STEPS = 7;
-const STEP_TITLES = ["Group type", "Details", "Contribution", "Visibility", "Invitations", "Payout order", "Review"] as const;
+const STEP_TITLES = ["Saving model", "Details", "Contribution", "Visibility", "Invitations", "Group rules", "Review"] as const;
 
 type GroupType = "susu" | "family" | "church" | "cooperative" | "other";
 type Frequency = "daily" | "weekly" | "monthly";
+type SavingModel = "rotational" | "collective_goal";
 
 type Member = {
   id: string;
@@ -58,11 +59,13 @@ type Member = {
 type RotationEntry = Member & { isCreator?: boolean };
 
 type FormState = {
+  savingModel: SavingModel | null;
   groupType: GroupType | null;
   name: string;
   description: string;
   coverImage: ImagePicker.ImagePickerAsset | null;
   amount: string;
+  goalAmount: string;
   frequency: Frequency | null;
   gracePeriodDays: string;
   penaltyAmount: string;
@@ -153,48 +156,58 @@ function StepFooter({
   );
 }
 
-// ---------- Step 1: Group type ----------
+// ---------- Step 1: Saving model ----------
 
-function StepGroupType({
+function StepSavingModel({
   value,
   onSelect,
 }: {
-  value: GroupType | null;
-  onSelect: (v: GroupType) => void;
+  value: SavingModel | null;
+  onSelect: (v: SavingModel) => void;
 }) {
+  const options = [
+    {
+      key: "rotational" as const,
+      title: "Rotational susu",
+      description: "Members take turns receiving the pot.",
+      detail: "Everyone contributes each cycle until every member has received once.",
+      icon: "sync-outline" as const,
+    },
+    {
+      key: "collective_goal" as const,
+      title: "Collective goal",
+      description: "Everyone saves toward one shared target.",
+      detail: "The funds stay together until the target is reached and members approve a payout.",
+      icon: "flag-outline" as const,
+    },
+  ];
   return (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>What kind of group is this?</Text>
+      <Text style={styles.stepTitle}>How will this group save?</Text>
       <Text style={styles.stepSubtitle}>
-        This helps us tailor the setup to how your group works.
+        This choice controls how contributions are held and released.
       </Text>
 
-      <View style={styles.typeGrid}>
-        {GROUP_TYPES.map((type) => {
-          const isActive = value === type.key;
+      <View style={styles.modelList}>
+        {options.map((option) => {
+          const isActive = value === option.key;
           return (
             <KasaChoiceCard
-              accessibilityLabel={type.label}
-              key={type.key}
-              style={[styles.typeCard, isActive && styles.typeCardActive]}
-              onPress={() => onSelect(type.key)}
+              accessibilityLabel={option.title}
+              key={option.key}
+              style={[styles.modelCard, isActive && styles.typeCardActive]}
+              onPress={() => onSelect(option.key)}
               selected={isActive}
             >
-              <View
-                style={[
-                  styles.typeIconWrap,
-                  isActive && { backgroundColor: COLORS.primary },
-                ]}
-              >
-                <Ionicons
-                  name={type.icon}
-                  size={20}
-                  color={isActive ? COLORS.background : COLORS.primary}
-                />
+              <View style={[styles.modelIconWrap, isActive && styles.modelIconWrapActive]}>
+                <Ionicons name={option.icon} size={22} color={isActive ? COLORS.background : COLORS.primary} />
               </View>
-              <Text style={[styles.typeLabel, isActive && styles.typeLabelActive]}>
-                {type.label}
-              </Text>
+              <View style={styles.modelCopy}>
+                <Text style={[styles.modelTitle, isActive && styles.typeLabelActive]}>{option.title}</Text>
+                <Text style={styles.modelDescription}>{option.description}</Text>
+                <Text style={styles.modelDetail}>{option.detail}</Text>
+              </View>
+              <Ionicons name={isActive ? "checkmark-circle" : "ellipse-outline"} size={22} color={isActive ? COLORS.primary : COLORS.placeholder} />
             </KasaChoiceCard>
           );
         })}
@@ -206,19 +219,23 @@ function StepGroupType({
 // ---------- Step 2: Name, description, cover ----------
 
 function StepDetails({
+  groupType,
   name,
   description,
   coverImage,
   onChangeName,
   onChangeDescription,
   onChangeCoverImage,
+  onSelectGroupType,
 }: {
+  groupType: GroupType | null;
   name: string;
   description: string;
   coverImage: ImagePicker.ImagePickerAsset | null;
   onChangeName: (v: string) => void;
   onChangeDescription: (v: string) => void;
   onChangeCoverImage: (image: ImagePicker.ImagePickerAsset | null) => void;
+  onSelectGroupType: (value: GroupType) => void;
 }) {
   const [focused, setFocused] = useState<"name" | "desc" | null>(null);
 
@@ -243,7 +260,26 @@ function StepDetails({
         Members will see this name, so make it easy to recognize.
       </Text>
 
-      <View>
+      <Text style={styles.label}>Community type</Text>
+      <View style={styles.categoryChips}>
+        {GROUP_TYPES.map((type) => {
+          const active = groupType === type.key;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              key={type.key}
+              onPress={() => onSelectGroupType(type.key)}
+              style={[styles.categoryChip, active && styles.categoryChipActive]}
+            >
+              <Ionicons name={type.icon} size={15} color={active ? COLORS.background : COLORS.textMuted} />
+              <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>{type.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={{ marginTop: 20 }}>
         <Text style={styles.label}>Group name</Text>
         <View style={[styles.inputWrapper, focused === "name" && styles.inputWrapperFocused]}>
           <TextInput
@@ -314,23 +350,29 @@ function StepDetails({
 // ---------- Step 3: Contribution settings ----------
 
 function StepContribution({
+  savingModel,
   amount,
+  goalAmount,
   frequency,
   gracePeriodDays,
   penaltyAmount,
   expectedMemberCount,
   onChangeAmount,
+  onChangeGoalAmount,
   onChangeGracePeriod,
   onChangePenalty,
   onChangeExpectedMemberCount,
   onSelectFrequency,
 }: {
+  savingModel: SavingModel;
   amount: string;
+  goalAmount: string;
   frequency: Frequency | null;
   gracePeriodDays: string;
   penaltyAmount: string;
   expectedMemberCount: string;
   onChangeAmount: (v: string) => void;
+  onChangeGoalAmount: (v: string) => void;
   onChangeGracePeriod: (v: string) => void;
   onChangePenalty: (v: string) => void;
   onChangeExpectedMemberCount: (v: string) => void;
@@ -349,6 +391,21 @@ function StepContribution({
         onChangeText={onChangeAmount}
         value={amount}
       />
+
+      {savingModel === "collective_goal" ? (
+        <View style={styles.goalField}>
+          <KasaMoneyInput
+            error={goalAmount.length > 0 && Number(goalAmount) < Number(amount) ? "The goal must be at least one contribution." : undefined}
+            label="Shared savings goal"
+            onChangeText={onChangeGoalAmount}
+            value={goalAmount}
+          />
+          <View style={styles.goalNote}>
+            <Ionicons name="lock-closed-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.goalNoteText}>When the goal is reached, contributions pause and members decide the payout by majority vote.</Text>
+          </View>
+        </View>
+      ) : null}
 
       <Text style={[styles.label, { marginTop: 20 }]}>Frequency</Text>
       <View style={{ gap: 10 }}>
@@ -728,6 +785,37 @@ function StepRotation({
   );
 }
 
+function StepCollectiveRules() {
+  const rules = [
+    { icon: "flag-outline" as const, title: "Reach the shared goal", body: "Contributions remain in the group balance until the target is reached." },
+    { icon: "create-outline" as const, title: "Propose a payout", body: "The owner or treasurer chooses an active member, amount and purpose." },
+    { icon: "people-outline" as const, title: "Members vote", body: "A strict majority of active members must approve within 48 hours." },
+    { icon: "wallet-outline" as const, title: "Release to wallet", body: "Once approved, the recipient's KasaFund wallet is credited automatically." },
+  ];
+  return (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Agree on how money moves</Text>
+      <Text style={styles.stepSubtitle}>No single person can release the shared funds on their own.</Text>
+      <View style={styles.ruleList}>
+        {rules.map((rule, index) => (
+          <View key={rule.title} style={styles.collectiveRuleRow}>
+            <View style={styles.collectiveRuleIndex}><Text style={styles.collectiveRuleIndexText}>{index + 1}</Text></View>
+            <View style={styles.collectiveRuleIcon}><Ionicons name={rule.icon} size={19} color={COLORS.primary} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.collectiveRuleTitle}>{rule.title}</Text>
+              <Text style={styles.collectiveRuleBody}>{rule.body}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      <View style={styles.collectiveSafetyNote}>
+        <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.primary} />
+        <Text style={styles.collectiveSafetyText}>Every proposal, vote and payout is recorded in the group history.</Text>
+      </View>
+    </View>
+  );
+}
+
 // ---------- Step 7: Review ----------
 
 function StepReview({
@@ -743,7 +831,8 @@ function StepReview({
   const frequencyLabel = FREQUENCIES.find((f) => f.key === form.frequency)?.label ?? "—";
 
   const rows = [
-    { label: "Group type", value: groupTypeLabel },
+    { label: "Saving model", value: form.savingModel === "collective_goal" ? "Collective goal" : "Rotational susu" },
+    { label: "Community type", value: groupTypeLabel },
     { label: "Name", value: form.name || "—" },
     { label: "Contribution", value: form.amount ? `GH₵ ${form.amount}` : "—" },
     { label: "Frequency", value: frequencyLabel },
@@ -751,7 +840,9 @@ function StepReview({
     { label: "Late penalty", value: `GH₵ ${Number(form.penaltyAmount || 0).toFixed(2)}` },
     { label: "Visibility", value: form.isPublic ? "Public" : "Private" },
     { label: "Planned group size", value: `${form.expectedMemberCount} members` },
-    { label: "Your payout position", value: `#${form.creatorPayoutPosition + 1}` },
+    ...(form.savingModel === "collective_goal"
+      ? [{ label: "Shared goal", value: `GH₵ ${form.goalAmount}` }, { label: "Decision rule", value: "Strict majority vote" }]
+      : [{ label: "Your payout position", value: `#${form.creatorPayoutPosition + 1}` }]),
     { label: "Invitations", value: `${form.members.length} selected now` },
   ];
 
@@ -794,17 +885,17 @@ function StepReview({
           </View>
         </View>
         <Text style={styles.creatorAgreementBody}>
-          By creating this group, you accept the same contribution commitment as
-          every member. You must keep contributing through the round even after
-          receiving a payout.
+          {form.savingModel === "collective_goal"
+            ? "By creating this group, you accept the same contribution commitment as every member. Shared funds can only be released after the goal and a majority vote."
+            : "By creating this group, you accept the same contribution commitment as every member. You must keep contributing through the round even after receiving a payout."}
         </Text>
-        <View style={styles.creatorAgreementRule}>
+        {form.savingModel === "rotational" ? <View style={styles.creatorAgreementRule}>
           <Ionicons name="cash-outline" size={16} color={COLORS.primary} />
           <Text style={styles.creatorAgreementRuleText}>
             A post-payout default can make your unpaid same-round commitment
             immediately due to the remaining recipients.
           </Text>
-        </View>
+        </View> : null}
         <View style={styles.creatorAgreementRule}>
           <Ionicons name="people-outline" size={16} color={COLORS.primary} />
           <Text style={styles.creatorAgreementRuleText}>
@@ -854,11 +945,13 @@ export default function CreateGroupScreen() {
     failedInvitations: number;
   } | null>(null);
   const [form, setForm] = useState<FormState>({
+    savingModel: null,
     groupType: null,
     name: "",
     description: "",
     coverImage: null,
     amount: "",
+    goalAmount: "",
     frequency: null,
     gracePeriodDays: "2",
     penaltyAmount: "0",
@@ -872,6 +965,8 @@ export default function CreateGroupScreen() {
     setCreatorAgreementAccepted(false);
   }, [
     form.amount,
+    form.goalAmount,
+    form.savingModel,
     form.frequency,
     form.gracePeriodDays,
     form.penaltyAmount,
@@ -882,12 +977,13 @@ export default function CreateGroupScreen() {
   const canContinue = () => {
     switch (step) {
       case 1:
-        return !!form.groupType;
+        return !!form.savingModel;
       case 2:
-        return form.name.trim().length > 0;
+        return !!form.groupType && form.name.trim().length > 0;
       case 3:
         return Number(form.amount) > 0 && Number(form.gracePeriodDays || 0) >= 0 &&
           Number(form.penaltyAmount || 0) >= 0 && !!form.frequency &&
+          (form.savingModel !== "collective_goal" || Number(form.goalAmount) >= Number(form.amount)) &&
           Number.isInteger(Number(form.expectedMemberCount)) &&
           Number(form.expectedMemberCount) >= Math.max(2, form.members.length + 1) &&
           Number(form.expectedMemberCount) <= 50;
@@ -906,9 +1002,9 @@ export default function CreateGroupScreen() {
   };
 
   const requirementText = () => {
-    if (step === 1) return "Choose the type of group to continue.";
-    if (step === 2) return "Enter a name your members will recognize.";
-    if (step === 3) return "Enter a valid amount and choose a contribution frequency.";
+    if (step === 1) return "Choose how the group will save.";
+    if (step === 2) return "Choose a community type and enter a group name.";
+    if (step === 3) return form.savingModel === "collective_goal" ? "Enter a valid contribution and shared goal." : "Enter a valid amount and choose a contribution frequency.";
     if (step === 7) return "Review and accept the creator agreement to continue.";
     return undefined;
   };
@@ -917,7 +1013,7 @@ export default function CreateGroupScreen() {
     if (step < TOTAL_STEPS) {
       setStep(step + 1);
     } else {
-      if (!form.groupType || !form.frequency || isSubmitting) return;
+      if (!form.savingModel || !form.groupType || !form.frequency || isSubmitting) return;
       try {
         setIsSubmitting(true);
         const uploadedCover = form.coverImage
@@ -928,15 +1024,19 @@ export default function CreateGroupScreen() {
           description: form.description.trim(),
           coverImageUrl: uploadedCover?.data.url,
           type: form.groupType,
+          savingModel: form.savingModel,
           contribution: {
             amount: Math.round(Number(form.amount) * 100),
             frequency: form.frequency,
             gracePeriodDays: Number(form.gracePeriodDays) || 0,
             penaltyAmount: Math.round(Number(form.penaltyAmount || 0) * 100),
           },
-          rotation: { isEnabled: true },
+          rotation: { isEnabled: form.savingModel === "rotational" },
+          collectiveGoal: form.savingModel === "collective_goal"
+            ? { targetAmount: Math.round(Number(form.goalAmount) * 100) }
+            : undefined,
           expectedMemberCount: Number(form.expectedMemberCount),
-          creatorPayoutPosition: form.creatorPayoutPosition,
+          creatorPayoutPosition: form.savingModel === "rotational" ? form.creatorPayoutPosition : 0,
           isPublic: form.isPublic,
           agreementAccepted: creatorAgreementAccepted,
           agreementVersion: GROUP_AGREEMENT_VERSION,
@@ -946,8 +1046,9 @@ export default function CreateGroupScreen() {
           form.members.map((member, index) =>
             apiService.inviteGroupMember(response.data._id, {
               userId: member.id,
-              payoutPosition:
-                index >= form.creatorPayoutPosition ? index + 1 : index,
+              payoutPosition: form.savingModel === "rotational"
+                ? (index >= form.creatorPayoutPosition ? index + 1 : index)
+                : 0,
             })
           )
         );
@@ -1066,29 +1167,34 @@ export default function CreateGroupScreen() {
         showsVerticalScrollIndicator={false}
       >
         {step === 1 && (
-          <StepGroupType
-            value={form.groupType}
-            onSelect={(v) => setForm((p) => ({ ...p, groupType: v }))}
+          <StepSavingModel
+            value={form.savingModel}
+            onSelect={(v) => setForm((p) => ({ ...p, savingModel: v }))}
           />
         )}
         {step === 2 && (
           <StepDetails
+            groupType={form.groupType}
             name={form.name}
             description={form.description}
             coverImage={form.coverImage}
             onChangeName={(v) => setForm((p) => ({ ...p, name: v }))}
             onChangeDescription={(v) => setForm((p) => ({ ...p, description: v }))}
             onChangeCoverImage={(coverImage) => setForm((p) => ({ ...p, coverImage }))}
+            onSelectGroupType={(groupType) => setForm((p) => ({ ...p, groupType }))}
           />
         )}
         {step === 3 && (
           <StepContribution
+            savingModel={form.savingModel!}
             amount={form.amount}
+            goalAmount={form.goalAmount}
             frequency={form.frequency}
             gracePeriodDays={form.gracePeriodDays}
             penaltyAmount={form.penaltyAmount}
             expectedMemberCount={form.expectedMemberCount}
             onChangeAmount={(v) => setForm((p) => ({ ...p, amount: v }))}
+            onChangeGoalAmount={(v) => setForm((p) => ({ ...p, goalAmount: v }))}
             onChangeGracePeriod={(v) => setForm((p) => ({ ...p, gracePeriodDays: v }))}
             onChangePenalty={(v) => setForm((p) => ({ ...p, penaltyAmount: v }))}
             onChangeExpectedMemberCount={(v) => setForm((p) => ({ ...p, expectedMemberCount: v }))}
@@ -1102,7 +1208,7 @@ export default function CreateGroupScreen() {
           />
         )}
         {step === 5 && <StepInvite members={form.members} onToggleMember={toggleMember} />}
-        {step === 6 && (
+        {step === 6 && form.savingModel === "rotational" && (
           <StepRotation
             members={form.members}
             creatorPosition={form.creatorPayoutPosition}
@@ -1111,6 +1217,7 @@ export default function CreateGroupScreen() {
             }
           />
         )}
+        {step === 6 && form.savingModel === "collective_goal" && <StepCollectiveRules />}
         {step === 7 && (
           <StepReview
             agreementAccepted={creatorAgreementAccepted}
@@ -1190,7 +1297,33 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // Step 1 — group type grid
+  // Step 1 — saving model
+  modelList: { gap: 12 },
+  modelCard: {
+    alignItems: "flex-start",
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+  },
+  modelIconWrap: {
+    alignItems: "center",
+    backgroundColor: "#E8F5EE",
+    borderRadius: 12,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  modelIconWrapActive: { backgroundColor: COLORS.primary },
+  modelCopy: { flex: 1 },
+  modelTitle: { color: COLORS.text, fontSize: 16, fontWeight: "800", marginBottom: 3 },
+  modelDescription: { color: COLORS.text, fontSize: 13, fontWeight: "600", lineHeight: 18 },
+  modelDetail: { color: COLORS.textMuted, fontSize: 11, lineHeight: 16, marginTop: 5 },
+
+  // Step 2 — community type
   typeGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1227,6 +1360,24 @@ const styles = StyleSheet.create({
   typeLabelActive: {
     color: COLORS.primary,
   },
+  categoryChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  categoryChip: {
+    alignItems: "center",
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  categoryChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  categoryChipText: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700" },
+  categoryChipTextActive: { color: COLORS.background },
+  goalField: { gap: 10, marginTop: 18 },
+  goalNote: { alignItems: "flex-start", backgroundColor: "#EDF7F3", borderRadius: 12, flexDirection: "row", gap: 8, padding: 12 },
+  goalNoteText: { color: COLORS.textMuted, flex: 1, fontSize: 11, lineHeight: 16 },
 
   // Step 2 — details
   coverPicker: {
@@ -1663,6 +1814,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
   },
+  ruleList: { gap: 10 },
+  collectiveRuleRow: { alignItems: "center", backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 13 },
+  collectiveRuleIndex: { alignItems: "center", backgroundColor: COLORS.primary, borderRadius: 10, height: 24, justifyContent: "center", width: 24 },
+  collectiveRuleIndexText: { color: COLORS.background, fontSize: 11, fontWeight: "800" },
+  collectiveRuleIcon: { alignItems: "center", backgroundColor: "#E8F5EE", borderRadius: 10, height: 38, justifyContent: "center", width: 38 },
+  collectiveRuleTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
+  collectiveRuleBody: { color: COLORS.textMuted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  collectiveSafetyNote: { alignItems: "center", backgroundColor: "#EDF7F3", borderRadius: 13, flexDirection: "row", gap: 9, marginTop: 14, padding: 13 },
+  collectiveSafetyText: { color: COLORS.textMuted, flex: 1, fontSize: 11, lineHeight: 16 },
 
   // Step 7 — review
   reviewCard: {

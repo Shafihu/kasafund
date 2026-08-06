@@ -43,6 +43,10 @@ import {
 } from "../middleware/auth.js";
 import chatRoutes from "./chat.js";
 import { getGroupLedger } from "../controllers/ledgerController.js";
+import {
+  createCollectivePayoutProposal,
+  voteOnCollectivePayout,
+} from "../controllers/collectivePayoutController.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -61,6 +65,18 @@ router.post(
   respondToInvitation
 );
 router.post("/:id/resolutions", kycAction("propose a group resolution"), requireKyc, createResolution);
+router.post(
+  "/:id/collective-payouts",
+  kycAction("propose a shared-goal payout"),
+  requireKyc,
+  createCollectivePayoutProposal
+);
+router.post(
+  "/:id/collective-payouts/:proposalId/vote",
+  kycAction("vote on a shared-goal payout"),
+  requireKyc,
+  voteOnCollectivePayout
+);
 router.post(
   "/:id/resolutions/:resolutionId/vote",
   kycAction("vote on a group resolution"),

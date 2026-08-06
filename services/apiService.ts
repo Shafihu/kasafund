@@ -63,6 +63,7 @@ export interface ApiUser {
   isPhoneVerified?: boolean;
   identityVerification?: IdentityVerificationStatus;
   paystackCustomerCode?: string;
+  payoutMethod?: PayoutMethod | null;
   walletBalance?: number;
   notificationPrefs?: {
     push: boolean;
@@ -209,6 +210,7 @@ export interface ApiError {
 }
 
 export type GroupType = "susu" | "family" | "church" | "cooperative" | "other";
+export type GroupSavingModel = "rotational" | "collective_goal";
 export type ContributionFrequency = "daily" | "weekly" | "monthly";
 
 export interface CreateGroupRequest {
@@ -216,6 +218,7 @@ export interface CreateGroupRequest {
   description?: string;
   coverImageUrl?: string;
   type: GroupType;
+  savingModel: GroupSavingModel;
   contribution: {
     amount: number;
     frequency: ContributionFrequency;
@@ -224,6 +227,10 @@ export interface CreateGroupRequest {
     penaltyAmount?: number;
   };
   rotation?: { isEnabled: boolean };
+  collectiveGoal?: {
+    targetAmount: number;
+    targetDate?: string;
+  };
   expectedMemberCount: number;
   creatorPayoutPosition: number;
   isPublic?: boolean;
@@ -331,6 +338,7 @@ export interface ApiGroup {
   description?: string;
   coverImageUrl?: string;
   type: GroupType;
+  savingModel: GroupSavingModel;
   memberCount: number;
   totalPot: number;
   status: "setup" | "active" | "paused" | "completed" | "archived";
@@ -355,6 +363,34 @@ export interface ApiGroup {
     roundNumber?: number;
     cycleStartedAt?: string | null;
   };
+  collectiveGoal?: {
+    targetAmount: number;
+    totalSaved: number;
+    paidOutAmount: number;
+    targetDate?: string | null;
+    status: "saving" | "target_reached" | "completed";
+    reachedAt?: string | null;
+    completedAt?: string | null;
+  } | null;
+}
+
+export interface ApiCollectivePayoutProposal {
+  _id: string;
+  proposedBy: { _id: string; fullName: string; avatarUrl?: string };
+  recipient: { _id: string; fullName: string; avatarUrl?: string };
+  amount: number;
+  purpose: string;
+  status: "voting" | "approved" | "rejected" | "paid" | "expired" | "cancelled";
+  eligibleVoterCount: number;
+  requiredYesVotes: number;
+  yesVotes: number;
+  noVotes: number;
+  currentUserVote: "approve" | "reject" | null;
+  canVote: boolean;
+  expiresAt: string;
+  decidedAt?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
 }
 
 export interface DirectoryUser {
@@ -573,6 +609,8 @@ export interface ApiGroupDetail {
     expiresAt: string;
     attemptNumber: number;
   } | null;
+  currentCollectiveProposal: ApiCollectivePayoutProposal | null;
+  collectivePayoutProposals: ApiCollectivePayoutProposal[];
   unreadChatCount: number;
 }
 
@@ -877,6 +915,16 @@ export interface DebtPaymentInitialization {
 export interface PayoutProvider {
   code: string;
   name: string;
+}
+
+export interface PayoutMethod {
+  type: "mobile_money" | "bank";
+  providerCode: string;
+  providerName: string;
+  accountName: string;
+  accountLast4: string;
+  transferMode: "live" | "mock";
+  verifiedAt: string;
 }
 
 export interface WalletWithdrawalResult {
@@ -1376,18 +1424,30 @@ class ApiService {
     );
   }
 
-  async getPayoutProviders() {
+  async getPayoutProviders(type: PayoutMethod["type"] = "mobile_money") {
     return this.makeRequest<ApiRecordResponse<PayoutProvider[]>>(
-      "/payments/wallet/payout-providers"
+      `/payments/wallet/payout-providers?type=${encodeURIComponent(type)}`
     );
   }
 
-  async createWalletWithdrawal(withdrawal: {
-    amount: number;
-    accountNumber: string;
+  async getPayoutMethod() {
+    return this.makeRequest<ApiRecordResponse<PayoutMethod | null>>(
+      "/payments/wallet/payout-method"
+    );
+  }
+
+  async savePayoutMethod(method: {
+    type: PayoutMethod["type"];
     providerCode: string;
-    providerName: string;
+    accountNumber: string;
   }) {
+    return this.makeRequest<ApiRecordResponse<PayoutMethod>>(
+      "/payments/wallet/payout-method",
+      { method: "PUT", body: JSON.stringify(method) }
+    );
+  }
+
+  async createWalletWithdrawal(withdrawal: { amount: number }) {
     return this.makeRequest<ApiRecordResponse<WalletWithdrawalResult>>(
       "/payments/wallet/withdrawals",
       { method: "POST", body: JSON.stringify(withdrawal) }
@@ -1459,6 +1519,27 @@ class ApiService {
     return this.makeRequest<ApiRecordResponse<ApiGroupDetail["payouts"][number]>>(
       `/groups/${groupId}/payouts/${payoutId}/extend-grace`,
       { method: "POST", body: JSON.stringify({ days }) }
+    );
+  }
+
+  async createCollectivePayoutProposal(
+    groupId: string,
+    proposal: { recipientId: string; amount: number; purpose: string }
+  ) {
+    return this.makeRequest<ApiRecordResponse<ApiCollectivePayoutProposal>>(
+      `/groups/${groupId}/collective-payouts`,
+      { method: "POST", body: JSON.stringify(proposal) }
+    );
+  }
+
+  async voteOnCollectivePayout(
+    groupId: string,
+    proposalId: string,
+    choice: "approve" | "reject"
+  ) {
+    return this.makeRequest<ApiRecordResponse<ApiCollectivePayoutProposal>>(
+      `/groups/${groupId}/collective-payouts/${proposalId}/vote`,
+      { method: "POST", body: JSON.stringify({ choice }) }
     );
   }
 

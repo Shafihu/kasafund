@@ -66,6 +66,20 @@ const identityVerificationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const payoutMethodSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["mobile_money", "bank"], required: true },
+    providerCode: { type: String, required: true, trim: true, maxlength: 30 },
+    providerName: { type: String, required: true, trim: true, maxlength: 100 },
+    accountName: { type: String, required: true, trim: true, maxlength: 120 },
+    accountLast4: { type: String, required: true, trim: true, minlength: 4, maxlength: 4 },
+    recipientCode: { type: String, required: true, trim: true, select: false },
+    transferMode: { type: String, enum: ["live", "mock"], required: true },
+    verifiedAt: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true, trim: true, maxlength: 80 },
@@ -122,6 +136,7 @@ const userSchema = new mongoose.Schema(
     emailVerificationSentAt: { type: Date, default: null, select: false },
     emailVerificationAttempts: { type: Number, default: 0, select: false },
     paystackCustomerCode: { type: String, default: "", trim: true },
+    payoutMethod: { type: payoutMethodSchema, default: null },
     walletBalance: { type: Number, default: 0, min: 0, validate: Number.isInteger },
     notificationPrefs: {
       type: notificationPreferencesSchema,
@@ -157,6 +172,7 @@ userSchema.set("toJSON", {
     delete result.phoneVerificationSentAt;
     delete result.phoneVerificationAttempts;
     delete result.profileImage;
+    if (result.payoutMethod) delete result.payoutMethod.recipientCode;
     if (result.identityVerification) {
       delete result.identityVerification.sessionId;
       delete result.identityVerification.lastWebhookEventId;

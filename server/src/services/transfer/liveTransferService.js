@@ -2,6 +2,7 @@ import {
   createTransferRecipient,
   finalizeTransfer,
   initiateTransfer,
+  listGhanaBanks,
   listGhanaMobileMoneyProviders,
   verifyTransfer,
 } from "../paystackService.js";
@@ -25,16 +26,18 @@ function normalizeTransfer(raw) {
 export const liveTransferService = Object.freeze({
   mode: "live",
 
-  async listProviders() {
-    const providers = await listGhanaMobileMoneyProviders();
+  async listProviders(type = "mobile_money") {
+    const providers = type === "bank"
+      ? await listGhanaBanks()
+      : await listGhanaMobileMoneyProviders();
     return providers
       .filter((provider) => provider.active !== false)
       .map((provider) => ({ code: provider.code, name: provider.name }));
   },
 
-  async createRecipient({ name, accountNumber, providerCode, currency }) {
+  async createRecipient({ type = "mobile_money", name, accountNumber, providerCode, currency }) {
     const raw = await createTransferRecipient({
-      type: "mobile_money",
+      type: type === "bank" ? "ghipss" : "mobile_money",
       name,
       account_number: accountNumber,
       bank_code: providerCode,
@@ -45,6 +48,7 @@ export const liveTransferService = Object.freeze({
       mode: "live",
       mocked: false,
       note: "Paystack transfer recipient",
+      accountName: raw.details?.account_name || raw.name || name,
       raw,
     };
   },

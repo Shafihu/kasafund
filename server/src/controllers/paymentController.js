@@ -25,6 +25,7 @@ import {
 import { transferService } from "../services/transfer/index.js";
 import { nowForGroup } from "../services/developmentClockService.js";
 import { ensureNextPayout } from "../services/payoutScheduleService.js";
+import { scheduledGroupContribution } from "../services/groupContributionScheduleService.js";
 
 const MIN_DEPOSIT = 100;
 const MIN_WITHDRAWAL = 100;
@@ -57,35 +58,6 @@ function normalizeGhanaPhone(value) {
   return /^0\d{9}$/.test(phone) ? phone : null;
 }
 
-function scheduledContribution(contribution, now = new Date()) {
-  const start = new Date(contribution.startDate);
-  if (start > now) return { cycleNumber: 1, dueDate: start };
-
-  if (contribution.frequency === "daily") {
-    const elapsed = Math.floor((now.getTime() - start.getTime()) / 86_400_000);
-    const dueDate = new Date(start);
-    dueDate.setDate(start.getDate() + elapsed);
-    return { cycleNumber: elapsed + 1, dueDate };
-  }
-  if (contribution.frequency === "weekly") {
-    const elapsed = Math.floor((now.getTime() - start.getTime()) / (7 * 86_400_000));
-    const dueDate = new Date(start);
-    dueDate.setDate(start.getDate() + elapsed * 7);
-    return { cycleNumber: elapsed + 1, dueDate };
-  }
-
-  const elapsed = Math.max(
-    0,
-    (now.getFullYear() - start.getFullYear()) * 12 +
-      now.getMonth() -
-      start.getMonth() -
-      (now.getDate() < start.getDate() ? 1 : 0)
-  );
-  const dueDate = new Date(start);
-  dueDate.setMonth(start.getMonth() + elapsed);
-  return { cycleNumber: elapsed + 1, dueDate };
-}
-
 function serializeWalletTransaction(transaction) {
   const relatedGroup = transaction.relatedGroupId;
   const relatedSavingsPot = transaction.relatedSavingsPotId;
@@ -106,6 +78,19 @@ function serializeWalletTransaction(transaction) {
     failureReason: transaction.failureReason,
     completedAt: transaction.completedAt,
     createdAt: transaction.createdAt,
+  };
+}
+
+function serializePayoutMethod(method) {
+  if (!method) return null;
+  return {
+    type: method.type,
+    providerCode: method.providerCode,
+    providerName: method.providerName,
+    accountName: method.accountName,
+    accountLast4: method.accountLast4,
+    transferMode: method.transferMode,
+    verifiedAt: method.verifiedAt,
   };
 }
 
@@ -487,9 +472,10 @@ export async function verifyWalletDeposit(req, res) {
   }
 }
 
-export async function getPayoutProviders(_req, res) {
+export async function getPayoutProviders(req, res) {
+  const type = req.query.type === "bank" ? "bank" : "mobile_money";
   try {
-    const providers = await transferService.listProviders();
+    const providers = await transferService.listProviders(type);
     return res.json({
       success: true,
       data: providers,
@@ -499,11 +485,83 @@ export async function getPayoutProviders(_req, res) {
   }
 }
 
+export function getPayoutMethod(req, res) {
+  return res.json({ success: true, data: serializePayoutMethod(req.user.payoutMethod) });
+}
+
+export async function savePayoutMethod(req, res) {
+  const type = req.body.type === "bank" ? "bank" : req.body.type === "mobile_money" ? "mobile_money" : null;
+  const providerCode = String(req.body.providerCode || "").trim().toUpperCase();
+  const submittedAccount = String(req.body.accountNumber || "").trim();
+  const accountNumber = type === "mobile_money"
+    ? normalizeGhanaPhone(submittedAccount)
+    : /^\d{6,20}$/.test(submittedAccount.replace(/\s/g, ""))
+      ? submittedAccount.replace(/\s/g, "")
+      : null;
+
+  if (!type || !accountNumber || !/^[A-Z0-9_-]{2,30}$/.test(providerCode)) {
+    return res.status(400).json({
+      success: false,
+      message: type === "bank"
+        ? "A valid bank and account number are required"
+        : "A valid Ghana mobile money number and provider are required",
+    });
+  }
+  if (await WalletTransaction.exists({
+    userId: req.user._id,
+    type: "withdrawal",
+    status: { $in: ["initialized", "pending"] },
+  })) {
+    return res.status(409).json({
+      success: false,
+      message: "Wait for your pending withdrawal to finish before changing the payout method",
+    });
+  }
+
+  try {
+    const providers = await transferService.listProviders(type);
+    const provider = providers.find((item) => item.code.toUpperCase() === providerCode);
+    if (!provider) {
+      return res.status(400).json({ success: false, message: "Choose an available payout provider" });
+    }
+    const recipient = await transferService.createRecipient({
+      type,
+      name: req.user.fullName,
+      accountNumber,
+      providerCode,
+      currency: "GHS",
+    });
+    const user = await User.findById(req.user._id).select("+payoutMethod.recipientCode");
+    user.payoutMethod = {
+      type,
+      providerCode,
+      providerName: provider.name,
+      accountName: recipient.accountName || req.user.fullName,
+      accountLast4: accountNumber.slice(-4),
+      recipientCode: recipient.recipientCode,
+      transferMode: recipient.mode,
+      verifiedAt: new Date(),
+    };
+    await user.save();
+    await audit({
+      actorId: user._id,
+      action: "wallet.payout_method_saved",
+      targetType: "user",
+      targetId: user._id,
+      metadata: { type, providerCode, accountLast4: accountNumber.slice(-4) },
+    });
+    return res.json({
+      success: true,
+      message: req.user.payoutMethod ? "Payout method replaced" : "Payout method saved",
+      data: serializePayoutMethod(user.payoutMethod),
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 502).json({ success: false, message: error.message });
+  }
+}
+
 export async function createWalletWithdrawal(req, res) {
   const amount = req.body.amount;
-  const accountNumber = normalizeGhanaPhone(req.body.accountNumber);
-  const providerCode = String(req.body.providerCode || "").trim().toUpperCase();
-  const providerName = String(req.body.providerName || providerCode).trim().slice(0, 80);
 
   if (!validAmount(amount, MIN_WITHDRAWAL)) {
     return res.status(400).json({
@@ -511,27 +569,25 @@ export async function createWalletWithdrawal(req, res) {
       message: "Withdrawal amount must be between GHS 1 and GHS 100,000",
     });
   }
-  if (!accountNumber || !/^[A-Z0-9_-]{2,20}$/.test(providerCode)) {
-    return res.status(400).json({
-      success: false,
-      message: "A valid Ghana mobile money number and provider are required",
-    });
-  }
   if (req.user.walletBalance < amount) {
     return res.status(400).json({ success: false, message: "Insufficient wallet balance" });
   }
 
-  let recipient;
-  try {
-    recipient = await transferService.createRecipient({
-      name: req.user.fullName,
-      accountNumber,
-      providerCode,
-      currency: "GHS",
+  const payoutUser = await User.findById(req.user._id).select("+payoutMethod.recipientCode");
+  const method = payoutUser?.payoutMethod;
+  if (!method?.recipientCode) {
+    return res.status(409).json({
+      success: false,
+      code: "PAYOUT_METHOD_REQUIRED",
+      message: "Add a payout method before withdrawing money",
     });
-  } catch (error) {
-    return res.status(error.statusCode || 502).json({ success: false, message: error.message });
   }
+  const recipient = {
+    recipientCode: method.recipientCode,
+    mode: method.transferMode,
+    mocked: method.transferMode === "mock",
+    note: "Saved KasaFund payout method",
+  };
 
   const reference = paymentReference("ksf_wdr");
   const session = await mongoose.startSession();
@@ -562,9 +618,9 @@ export async function createWalletWithdrawal(req, res) {
             note: recipient.note,
           },
           destination: {
-            providerCode,
-            providerName,
-            accountLast4: accountNumber.slice(-4),
+            providerCode: method.providerCode,
+            providerName: method.providerName,
+            accountLast4: method.accountLast4,
           },
         }],
         { session }
@@ -669,12 +725,23 @@ export async function startContribution(req, res) {
   const member = await GroupMember.findOne({ groupId: req.params.groupId, userId: req.user._id, status: "active" });
   if (!group || !member) return res.status(404).json({ success: false, message: "Active group membership required" });
   const contributionNow = nowForGroup(group._id);
+  if (
+    group.savingModel === "collective_goal" &&
+    group.collectiveGoal?.status !== "saving"
+  ) {
+    return res.status(409).json({
+      success: false,
+      message: "This group has reached its shared goal. New contributions are paused while members decide the payout.",
+    });
+  }
   const paymentMethod = req.body.paymentMethod;
   if (!["mobile_money", "card", "wallet"].includes(paymentMethod)) {
     return res.status(400).json({ success: false, message: "Choose a valid payment method" });
   }
 
-  const scheduledPayout = await ensureNextPayout(group._id);
+  const scheduledPayout = group.savingModel === "collective_goal"
+    ? null
+    : await ensureNextPayout(group._id);
   if (
     scheduledPayout?.expectedContributorIds?.length &&
     !scheduledPayout.expectedContributorIds.some(
@@ -693,7 +760,7 @@ export async function startContribution(req, res) {
         amount: scheduledPayout.contributionAmount || group.contribution.amount,
       }
     : {
-        ...scheduledContribution(group.contribution),
+        ...scheduledGroupContribution(group.contribution, contributionNow),
         amount: group.contribution.amount,
       };
   if (scheduledPayout && !scheduledPayout.snapshotLockedAt) {

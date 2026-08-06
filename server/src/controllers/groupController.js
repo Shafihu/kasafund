@@ -19,6 +19,7 @@ import {
 } from "../services/payoutScheduleService.js";
 import { evaluatePayoutReadiness } from "../services/payoutReadinessService.js";
 import { expireGroupResolutions } from "../services/resolutionExpiryService.js";
+import { scheduledGroupContribution } from "../services/groupContributionScheduleService.js";
 import {
   getSimulatedGroupTime,
   nowForGroup,
@@ -33,6 +34,10 @@ import {
   groupArchiveErrorMessage,
   isEmptyScheduledPayout,
 } from "../services/groupArchiveService.js";
+import {
+  getCurrentCollectiveProposal,
+  listCollectiveProposals,
+} from "./collectivePayoutController.js";
 
 async function membership(groupId, userId) {
   return GroupMember.findOne({ groupId, userId, status: "active" });
@@ -63,6 +68,8 @@ export async function createGroup(req, res) {
     type,
     contribution,
     rotation,
+    savingModel = "rotational",
+    collectiveGoal,
     isPublic,
     expectedMemberCount,
     creatorPayoutPosition,
@@ -73,10 +80,19 @@ export async function createGroup(req, res) {
   if (!["daily", "weekly", "monthly"].includes(contribution.frequency)) {
     return res.status(400).json({ success: false, message: "Invalid contribution frequency" });
   }
+  if (!["rotational", "collective_goal"].includes(savingModel)) {
+    return res.status(400).json({ success: false, message: "Choose a valid saving model" });
+  }
+  if (
+    savingModel === "collective_goal" &&
+    (!Number.isInteger(collectiveGoal?.targetAmount) || collectiveGoal.targetAmount < contribution.amount)
+  ) {
+    return res.status(400).json({ success: false, message: "The shared goal must be at least one contribution" });
+  }
   if (!Number.isInteger(expectedMemberCount) || expectedMemberCount < 2 || expectedMemberCount > 50) {
     return res.status(400).json({ success: false, message: "Expected members must be between 2 and 50" });
   }
-  if (!Number.isInteger(creatorPayoutPosition) || creatorPayoutPosition < 0 || creatorPayoutPosition >= expectedMemberCount) {
+  if (savingModel === "rotational" && (!Number.isInteger(creatorPayoutPosition) || creatorPayoutPosition < 0 || creatorPayoutPosition >= expectedMemberCount)) {
     return res.status(400).json({ success: false, message: "Choose a valid payout position for the creator" });
   }
   if (!isHostedImageUrl(coverImageUrl)) {
@@ -119,6 +135,7 @@ export async function createGroup(req, res) {
         coverImageUrl,
         type,
         ownerId: req.user._id,
+        savingModel,
         contribution: {
           amount: contribution.amount,
           frequency: contribution.frequency,
@@ -127,14 +144,21 @@ export async function createGroup(req, res) {
           penaltyAmount: contribution.penaltyAmount || 0,
         },
         rotation: {
-          isEnabled: rotation?.isEnabled ?? true,
-          order: [req.user._id],
+          isEnabled: savingModel === "rotational" && (rotation?.isEnabled ?? true),
+          order: savingModel === "rotational" ? [req.user._id] : [],
           pendingOrder: [],
           completedRecipientIds: [],
           currentPositionIndex: 0,
           roundNumber: 1,
           cycleStartedAt: null,
         },
+        collectiveGoal: savingModel === "collective_goal"
+          ? {
+              targetAmount: collectiveGoal.targetAmount,
+              targetDate: collectiveGoal.targetDate || null,
+              status: "saving",
+            }
+          : null,
         expectedMemberCount,
         status: "setup",
         inviteCode: createShortCode(),
@@ -147,8 +171,8 @@ export async function createGroup(req, res) {
         groupId: group._id,
         userId: req.user._id,
         role: "owner",
-        payoutPosition: creatorPayoutPosition,
-        setupPayoutPosition: creatorPayoutPosition,
+        payoutPosition: savingModel === "rotational" ? creatorPayoutPosition : null,
+        setupPayoutPosition: savingModel === "rotational" ? creatorPayoutPosition : null,
         agreement,
       }],
       { session }
@@ -185,17 +209,18 @@ export async function activateGroup(req, res) {
   }
 
   const memberIds = activeMembers.map((member) => String(member.userId));
+  const isRotational = group.savingModel !== "collective_goal";
   const requestedOrder = Array.isArray(req.body.order)
     ? req.body.order.map(String)
     : activeMembers
         .sort((a, b) => (a.payoutPosition ?? 0) - (b.payoutPosition ?? 0))
         .map((member) => String(member.userId));
   const uniqueOrder = new Set(requestedOrder);
-  if (
+  if (isRotational && (
     requestedOrder.length !== memberIds.length ||
     uniqueOrder.size !== memberIds.length ||
     memberIds.some((userId) => !uniqueOrder.has(userId))
-  ) {
+  )) {
     return res.status(400).json({ success: false, message: "Payout order must include every accepted member exactly once" });
   }
 
@@ -208,14 +233,15 @@ export async function activateGroup(req, res) {
   await session.withTransaction(async () => {
     group.status = "active";
     group.contribution.startDate = scheduledStart;
-    group.rotation.order = requestedOrder;
+    group.rotation.isEnabled = isRotational;
+    group.rotation.order = isRotational ? requestedOrder : [];
     group.rotation.pendingOrder = [];
     group.rotation.completedRecipientIds = [];
     group.rotation.currentPositionIndex = 0;
     group.rotation.roundNumber = 1;
     group.rotation.cycleStartedAt = activatedAt;
     await group.save({ session });
-    await GroupMember.bulkWrite(
+    if (isRotational) await GroupMember.bulkWrite(
       requestedOrder.map((userId, payoutPosition) => ({
         updateOne: {
           filter: { groupId: group._id, userId, status: "active" },
@@ -224,13 +250,13 @@ export async function activateGroup(req, res) {
       })),
       { session }
     );
-    await ensureNextPayout(group._id, { session });
+    if (isRotational) await ensureNextPayout(group._id, { session });
     await audit({
       actorId: req.user._id,
       action: "group.activated",
       targetType: "group",
       targetId: group._id,
-      metadata: { memberCount: activeMembers.length, firstPayoutDate: scheduledStart },
+      metadata: { memberCount: activeMembers.length, firstContributionDate: scheduledStart, savingModel: group.savingModel },
       session,
     });
   });
@@ -240,9 +266,11 @@ export async function activateGroup(req, res) {
   if (otherMemberIds.length) {
     await Notification.insertMany(otherMemberIds.map((userId) => ({
       userId,
-      type: "payout_scheduled",
+      type: isRotational ? "payout_scheduled" : "savings_update",
       title: `${group.name} is now active`,
-      body: `The owner confirmed the payout order. The first payout is scheduled for ${scheduledStart.toLocaleDateString("en-GH")}.`,
+      body: isRotational
+        ? `The owner confirmed the payout order. The first payout is scheduled for ${scheduledStart.toLocaleDateString("en-GH")}.`
+        : `Shared-goal contributions begin on ${scheduledStart.toLocaleDateString("en-GH")}. Payouts require a member vote after the target is reached.`,
       relatedGroupId: group._id,
     })));
   }
@@ -359,6 +387,31 @@ async function addUserToGroup(
       );
     }
     const groupDocument = await Group.findById(group._id).session(session);
+    if (groupDocument.savingModel === "collective_goal") {
+      member.setupPayoutPosition = null;
+      member.payoutPosition = null;
+      await member.save({ session });
+      groupDocument.memberCount = await GroupMember.countDocuments({
+        groupId: group._id,
+        status: "active",
+      }).session(session);
+      await groupDocument.save({ session });
+      joined = true;
+      await audit({
+        actorId,
+        action: "group.joined",
+        targetType: "group",
+        targetId: group._id,
+        metadata: {
+          savingModel: groupDocument.savingModel,
+          agreementVersion: agreement.version,
+          agreementAcceptedAt: agreement.acceptedAt,
+          agreementSource: agreement.source,
+        },
+        session,
+      });
+      return;
+    }
     if (groupDocument.status === "setup") {
       member.setupPayoutPosition = Number.isInteger(requestedPosition)
         ? requestedPosition
@@ -672,7 +725,9 @@ export async function getGroup(req, res) {
   const member = membershipRecord?.status === "active" ? membershipRecord : null;
   if (!group.isPublic && !member) return res.status(403).json({ success: false, message: "Group access denied" });
 
-  const currentPayout = await ensureNextPayout(group._id);
+  const currentPayout = group.savingModel === "collective_goal"
+    ? null
+    : await ensureNextPayout(group._id);
   const groupNow = nowForGroup(group._id);
   const readiness = currentPayout
     ? await evaluatePayoutReadiness(currentPayout, { now: groupNow })
@@ -775,7 +830,15 @@ export async function getGroup(req, res) {
         attemptNumber: resolution.attemptNumber || 1,
       }
     : null;
-  const unreadChatCount = await getUnreadCount(group._id, member);
+  const [unreadChatCount, currentCollectiveProposal, collectivePayoutProposals] = await Promise.all([
+    getUnreadCount(group._id, member),
+    group.savingModel === "collective_goal" && member
+      ? getCurrentCollectiveProposal(group._id, req.user._id)
+      : null,
+    group.savingModel === "collective_goal" && member
+      ? listCollectiveProposals(group._id, req.user._id)
+      : [],
+  ]);
   return res.json({
     success: true,
     data: {
@@ -786,6 +849,8 @@ export async function getGroup(req, res) {
       payouts,
       currentPayoutReadiness,
       currentResolution,
+      currentCollectiveProposal,
+      collectivePayoutProposals,
       developmentSimulation: env.developmentToolsEnabled
         ? {
             enabled: true,
@@ -849,8 +914,14 @@ export async function updateAutoContribution(req, res) {
     if (!group) {
       return res.status(404).json({ success: false, message: "Active group not found" });
     }
-    const payout = await ensureNextPayout(group._id);
-    nextRunAt = payout?.scheduledDate || null;
+    const payout = group.savingModel === "collective_goal"
+      ? null
+      : await ensureNextPayout(group._id);
+    nextRunAt = payout?.scheduledDate || (
+      group.savingModel === "collective_goal"
+        ? scheduledGroupContribution(group.contribution, nowForGroup(group._id)).dueDate
+        : null
+    );
   }
 
   member.autoContribution.enabled = enabled;
@@ -1083,6 +1154,9 @@ export async function reorderRotation(req, res) {
 
   const group = await Group.findById(req.params.id);
   if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+  if (group.savingModel === "collective_goal") {
+    return res.status(409).json({ success: false, message: "Collective-goal groups do not use a payout rotation" });
+  }
   const roundHasStarted =
     (group.rotation.completedRecipientIds || []).length > 0 ||
     (group.rotation.currentPositionIndex || 0) > 0;
@@ -1257,7 +1331,7 @@ export async function inviteMember(req, res) {
   if (!manager || !["owner", "treasurer"].includes(manager.role)) {
     return res.status(403).json({ success: false, message: "Owner or treasurer permission required" });
   }
-  const group = await Group.findById(req.params.id).select("name");
+  const group = await Group.findById(req.params.id).select("name status savingModel");
   if (!group) return res.status(404).json({ success: false, message: "Group not found" });
   const { email, phone, userId, payoutPosition } = req.body;
   if (!email && !phone && !userId) return res.status(400).json({ success: false, message: "A user, email, or phone is required" });
@@ -1308,7 +1382,7 @@ export async function inviteMember(req, res) {
     return res.status(409).json({ success: false, message: "User already has a pending invitation" });
   }
   let assignedPayoutPosition = Number.isInteger(payoutPosition) ? payoutPosition : null;
-  if (group.status === "setup" && invitedUser) {
+  if (group.status === "setup" && group.savingModel !== "collective_goal" && invitedUser) {
     const [setupMembers, pendingInvitations] = await Promise.all([
       GroupMember.find({ groupId: group._id, status: "active" }).select("setupPayoutPosition"),
       GroupInvitation.find({
@@ -1327,6 +1401,7 @@ export async function inviteMember(req, res) {
       while (occupied.has(assignedPayoutPosition)) assignedPayoutPosition += 1;
     }
   }
+  if (group.savingModel === "collective_goal") assignedPayoutPosition = null;
   const invitation = await GroupInvitation.create({
     groupId: req.params.id,
     invitedBy: req.user._id,

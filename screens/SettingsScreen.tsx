@@ -108,6 +108,15 @@ export function SettingsScreen() {
       title: "Preferences",
       items: [
         {
+          id: "payout-method",
+          title: "Payout method",
+          subtitle: user?.payoutMethod
+            ? `${user.payoutMethod.providerName} ending ${user.payoutMethod.accountLast4}`
+            : "Choose mobile money or a bank account",
+          icon: "arrow-down-circle-outline",
+          onPress: () => router.push("/profile/payout-method"),
+        },
+        {
           id: "wallet",
           title: "Wallet settings",
           subtitle: "Balance privacy and wallet information",

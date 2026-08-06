@@ -224,8 +224,21 @@ export async function completeContribution(data) {
     contribution.paidAt = data.paidAt || new Date();
     contribution.receiptUrl = data.receiptUrl || contribution.receiptUrl;
     await contribution.save({ session });
+    const group = await Group.findById(contribution.groupId).session(session);
+    if (!group) throw new Error("Contribution group was not found");
+    group.totalPot += contribution.amount;
+    if (group.savingModel === "collective_goal" && group.collectiveGoal) {
+      group.collectiveGoal.totalSaved += contribution.amount;
+      if (
+        group.collectiveGoal.status === "saving" &&
+        group.collectiveGoal.totalSaved >= group.collectiveGoal.targetAmount
+      ) {
+        group.collectiveGoal.status = "target_reached";
+        group.collectiveGoal.reachedAt = contribution.paidAt;
+      }
+    }
+    await group.save({ session });
     await Promise.all([
-      Group.updateOne({ _id: contribution.groupId }, { $inc: { totalPot: contribution.amount } }, { session }),
       GroupMember.updateOne(
         { groupId: contribution.groupId, userId: contribution.userId, status: "active" },
         { $inc: { totalContributed: contribution.amount }, $set: { lastContributionStatus: "paid" } },

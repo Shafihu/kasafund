@@ -7,6 +7,7 @@ import { Campaign } from "../src/models/Campaign.js";
 import { CampaignComment } from "../src/models/CampaignComment.js";
 import { CampaignUpdate } from "../src/models/CampaignUpdate.js";
 import { Contribution } from "../src/models/Contribution.js";
+import { CollectivePayoutProposal } from "../src/models/CollectivePayoutProposal.js";
 import { DebtPayment } from "../src/models/DebtPayment.js";
 import { Donation } from "../src/models/Donation.js";
 import { Group } from "../src/models/Group.js";
@@ -113,6 +114,14 @@ const groupSpecs = [
     amount: 15000, frequency: "weekly", completedCycles: 2, currentPaid: 4, public: true,
     cover: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80",
   },
+  {
+    key: "delivery", name: "Community Delivery Tricycle Fund", type: "cooperative",
+    description: "A shared savings goal for a delivery tricycle that members will use for their small businesses.",
+    owner: "kwame", members: ["kwame", "abena", "esi", "akosua", "efua", "kofi", "mabel", "daniel"],
+    amount: 25000, frequency: "weekly", completedCycles: 4, currentPaid: 8, public: false,
+    collective: true, targetAmount: 1000000,
+    cover: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80",
+  },
 ];
 
 const groupIds = Object.fromEntries(groupSpecs.map((group) => [group.key, id(`group:${group.key}`)]));
@@ -176,10 +185,12 @@ function buildGroups() {
     groups.push({
       _id: groupId, name: spec.name, description: spec.description, coverImageUrl: spec.cover,
       type: spec.type, ownerId: userIds[spec.owner],
+      savingModel: spec.collective ? "collective_goal" : "rotational",
       contribution: { amount: spec.amount, frequency: spec.frequency, startDate: currentDue, gracePeriodDays: 2, penaltyAmount: 1000 },
-      rotation: { isEnabled: true, order: memberObjectIds, pendingOrder: [], completedRecipientIds: completedRecipients, currentPositionIndex: spec.completedCycles % spec.members.length, roundNumber: 1, cycleStartedAt: days(startOffset - 2) },
+      rotation: { isEnabled: !spec.collective, order: spec.collective ? [] : memberObjectIds, pendingOrder: [], completedRecipientIds: spec.collective ? [] : completedRecipients, currentPositionIndex: spec.collective ? 0 : spec.completedCycles % spec.members.length, roundNumber: 1, cycleStartedAt: days(startOffset - 2) },
+      collectiveGoal: spec.collective ? { targetAmount: spec.targetAmount, totalSaved: spec.targetAmount, paidOutAmount: 0, status: "target_reached", reachedAt: days(-2) } : null,
       memberCount: spec.members.length, expectedMemberCount: spec.members.length,
-      totalPot: spec.amount * spec.currentPaid, status: "active", inviteCode: `DEMO${spec.key.slice(0, 4).toUpperCase()}`,
+      totalPot: spec.collective ? spec.targetAmount : spec.amount * spec.currentPaid, status: "active", inviteCode: `DEMO${spec.key.slice(0, 4).toUpperCase()}`,
       isPublic: spec.public, createdAt: days(startOffset - 60), updatedAt: days(-1),
     });
 
@@ -188,8 +199,8 @@ function buildGroups() {
       members.push({
         _id: id(`member:${spec.key}:${personKey}`), groupId, userId: userIds[personKey],
         role: personKey === spec.owner ? "owner" : position === 1 ? "treasurer" : "member",
-        status: "active", joinedAt: days(startOffset - 55 + position), payoutPosition: position,
-        setupPayoutPosition: position, lastContributionStatus: position < spec.currentPaid ? "paid" : "pending",
+        status: "active", joinedAt: days(startOffset - 55 + position), payoutPosition: spec.collective ? null : position,
+        setupPayoutPosition: spec.collective ? null : position, lastContributionStatus: position < spec.currentPaid ? "paid" : "pending",
         totalContributed: paidCycles * spec.amount, chatLastReadAt: personKey === "abena" ? days(-2) : days(0),
         agreement: { version: "2026-01", acceptedAt: days(startOffset - 55 + position), source: position === 0 ? "group_creation" : "invitation", termsSnapshot: { contributionAmount: spec.amount, contributionFrequency: spec.frequency, gracePeriodDays: 2, penaltyAmount: 1000, acceleratedDebt: true, resolutionVoting: true } },
       });
@@ -208,7 +219,7 @@ function buildGroups() {
       });
     }
 
-    for (let cycle = 1; cycle <= spec.completedCycles; cycle += 1) {
+    if (!spec.collective) for (let cycle = 1; cycle <= spec.completedCycles; cycle += 1) {
       const dueDate = days(startOffset + interval * (cycle - 1));
       payouts.push({
         _id: id(`payout:${spec.key}:${cycle}`), groupId, recipientId: userIds[spec.members[cycle - 1]],
@@ -219,7 +230,7 @@ function buildGroups() {
         status: "completed", createdAt: new Date(dueDate.getTime() - 7 * DAY),
       });
     }
-    payouts.push({
+    if (!spec.collective) payouts.push({
       _id: id(`payout:${spec.key}:${currentCycle}`), groupId,
       recipientId: userIds[spec.members[spec.completedCycles % spec.members.length]], cycleNumber: currentCycle,
       rotationRound: 1, amount: spec.amount * spec.members.length, scheduledDate: currentDue,
@@ -329,6 +340,7 @@ async function clearPresentationData() {
     }),
     GroupDelinquency.deleteMany({ groupId: { $in: seededGroups } }),
     GroupResolution.deleteMany({ groupId: { $in: seededGroups } }),
+    CollectivePayoutProposal.deleteMany({ groupId: { $in: seededGroups } }),
     GroupInvitation.deleteMany({ groupId: { $in: seededGroups } }),
     GroupJoinRequest.deleteMany({ groupId: { $in: seededGroups } }),
     GroupMessage.deleteMany({ groupId: { $in: seededGroups } }),
@@ -387,6 +399,16 @@ async function seed() {
         submittedAt: identityStatus === "not_started" ? null : days(-381 + index * 3),
         lastCheckedAt: identityStatus === "not_started" ? null : days(-1),
       },
+      payoutMethod: identityStatus === "verified" ? {
+        type: "mobile_money",
+        providerCode: index % 3 === 0 ? "MTN" : index % 3 === 1 ? "ATL" : "VOD",
+        providerName: index % 3 === 0 ? "MTN" : index % 3 === 1 ? "AirtelTigo" : "Telecel",
+        accountName: fullName,
+        accountLast4: String(index + 101).padStart(4, "0").slice(-4),
+        recipientCode: `RCP_mock_demo_${key}`,
+        transferMode: "mock",
+        verifiedAt: days(-120 + index),
+      } : null,
       isActive: true, lastLoginAt: days(index === 0 ? -1 : -index), createdAt: days(-450 + index * 7), updatedAt: days(-1),
     };
   });
@@ -424,6 +446,27 @@ async function seed() {
   await Contribution.insertMany(groupData.contributions);
   await Payout.insertMany(groupData.payouts);
   await GroupMessage.insertMany(groupData.messages);
+  await CollectivePayoutProposal.create({
+    _id: id("collective-proposal:delivery:1"),
+    groupId: groupIds.delivery,
+    proposedBy: userIds.kwame,
+    recipientId: userIds.akosua,
+    amount: 900000,
+    purpose: "Purchase the agreed delivery tricycle and complete registration for shared business use.",
+    status: "voting",
+    eligibleVoterIds: groupSpecs.find((group) => group.key === "delivery").members.map((key) => userIds[key]),
+    requiredYesVotes: 5,
+    votes: [
+      { userId: userIds.kwame, choice: "approve", votedAt: days(-1) },
+      { userId: userIds.esi, choice: "approve", votedAt: days(-1) },
+      { userId: userIds.kofi, choice: "approve", votedAt: days(-1) },
+      { userId: userIds.mabel, choice: "approve", votedAt: days(-1) },
+      { userId: userIds.daniel, choice: "reject", votedAt: days(-1) },
+    ],
+    expiresAt: days(2),
+    createdAt: days(-1),
+    updatedAt: days(-1),
+  });
 
   const campaignData = buildCampaigns();
   await Campaign.insertMany(campaignData.campaigns);
