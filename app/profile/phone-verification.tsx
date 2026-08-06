@@ -120,7 +120,7 @@ export default function PhoneVerificationScreen() {
             <Ionicons color={kasaColors.text} name="arrow-back" size={21} />
           </Pressable>
           <Text style={styles.headerTitle}>{changingNumber ? "Change phone number" : "Verify phone number"}</Text>
-          <View style={styles.headerButtonPlaceholder} />
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: kasaColors.background, flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: kasaColors.surface, borderColor: kasaColors.border, borderRadius: 12, borderWidth: 1, height: 44, justifyContent: "center", width: 44 },
-  headerButtonPlaceholder: { height: 44, width: 44 },
+  headerSpacer: { height: 44, width: 44 },
   headerTitle: { color: kasaColors.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 44, paddingHorizontal: 20, paddingTop: 22 },
   heroIcon: { alignItems: "center", backgroundColor: kasaColors.brandSoft, borderRadius: 20, height: 64, justifyContent: "center", width: 64 },

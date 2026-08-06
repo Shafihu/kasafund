@@ -58,7 +58,7 @@ export function SettingsPage({
           <Ionicons color={COLORS.text} name="arrow-back" size={21} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title}</Text>
-        <View style={styles.backButton} />
+        <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.subtitle}>{subtitle}</Text>
@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 42,
   },
+  headerSpacer: { height: 42, width: 42 },
   headerTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 40, paddingHorizontal: 20 },
   subtitle: { color: COLORS.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 25 },

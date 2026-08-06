@@ -6,6 +6,7 @@ import {
   KasaPaymentSummary,
   KasaSectionHeader,
 } from "@/components/ui";
+import { PayoutProviderLogo } from "@/components/payments/PayoutProviderLogo";
 import { kasaColors } from "@/constants/design";
 import { apiService, type PayoutMethod } from "@/services/apiService";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -162,7 +163,7 @@ export default function WithdrawScreen() {
             <Ionicons color={kasaColors.text} name="arrow-back" size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Withdraw</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -275,7 +276,7 @@ export default function WithdrawScreen() {
               ) : payoutMethod ? (
                 <KasaCard style={styles.savedMethodCard}>
                   <View style={styles.savedMethodIcon}>
-                    <Ionicons color={kasaColors.brand} name={payoutMethod.type === "bank" ? "business-outline" : "phone-portrait-outline"} size={21} />
+                    <PayoutProviderLogo providerCode={payoutMethod.providerCode} size={38} type={payoutMethod.type} />
                   </View>
                   <View style={styles.providerCopy}>
                     <Text style={styles.providerText}>{payoutMethod.providerName} •••• {payoutMethod.accountLast4}</Text>
@@ -339,6 +340,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: kasaColors.background, flex: 1 },
   header: { alignItems: "center", borderBottomColor: kasaColors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", height: 58, justifyContent: "space-between", paddingHorizontal: 16 },
   headerButton: { alignItems: "center", borderRadius: 14, height: 44, justifyContent: "center", width: 44 },
+  headerSpacer: { height: 44, width: 44 },
   headerTitle: { color: kasaColors.text, fontSize: 17, fontWeight: "700" },
   pressed: { opacity: 0.58, transform: [{ scale: 0.96 }] },
   content: { padding: 20, paddingBottom: 32 },

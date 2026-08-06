@@ -104,7 +104,7 @@ export default function ChangePasswordScreen() {
             <Ionicons color={COLORS.text} name="arrow-back" size={21} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Change password</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.securityIntro}>
@@ -138,6 +138,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: COLORS.background, flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
+  headerSpacer: { height: 42, width: 42 },
   headerTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 40, paddingHorizontal: 20 },
   securityIntro: { alignItems: "center", paddingHorizontal: 20, paddingVertical: 25 },

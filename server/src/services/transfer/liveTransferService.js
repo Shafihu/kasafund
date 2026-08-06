@@ -2,10 +2,9 @@ import {
   createTransferRecipient,
   finalizeTransfer,
   initiateTransfer,
-  listGhanaBanks,
-  listGhanaMobileMoneyProviders,
   verifyTransfer,
 } from "../paystackService.js";
+import { listPayoutProviders } from "../payoutProviderDirectoryService.js";
 
 function normalizeTransfer(raw) {
   return {
@@ -27,12 +26,7 @@ export const liveTransferService = Object.freeze({
   mode: "live",
 
   async listProviders(type = "mobile_money") {
-    const providers = type === "bank"
-      ? await listGhanaBanks()
-      : await listGhanaMobileMoneyProviders();
-    return providers
-      .filter((provider) => provider.active !== false)
-      .map((provider) => ({ code: provider.code, name: provider.name }));
+    return listPayoutProviders(type);
   },
 
   async createRecipient({ type = "mobile_money", name, accountNumber, providerCode, currency }) {

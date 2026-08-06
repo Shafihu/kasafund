@@ -184,7 +184,7 @@ export default function DonateCampaignScreen() {
             <Ionicons color={kasaColors.text} name="arrow-back" size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Make a donation</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -403,6 +403,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
   },
+  headerSpacer: { height: 44, width: 44 },
   headerTitle: { color: kasaColors.text, fontSize: 17, fontWeight: "700" },
   pressed: { opacity: 0.58, transform: [{ scale: 0.96 }] },
   content: { padding: 20, paddingBottom: 30 },

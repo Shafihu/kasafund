@@ -110,7 +110,7 @@ export default function AccountSettingsScreen() {
             <Ionicons color={COLORS.text} name="arrow-back" size={21} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Account settings</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={styles.intro}>Keep your identity and contact information accurate for groups, campaigns, and payouts.</Text>
@@ -242,6 +242,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: COLORS.background, flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
+  headerSpacer: { height: 42, width: 42 },
   headerTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 40, paddingHorizontal: 20 },
   intro: { color: COLORS.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 20 },

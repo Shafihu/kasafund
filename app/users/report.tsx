@@ -77,7 +77,7 @@ export default function ReportMemberScreen() {
             <Ionicons name="arrow-back" size={21} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Report member</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.notice}>
@@ -136,6 +136,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: COLORS.background, flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
+  headerSpacer: { height: 42, width: 42 },
   headerTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 42, paddingHorizontal: 20 },
   notice: { alignItems: "flex-start", backgroundColor: COLORS.soft, borderRadius: 16, flexDirection: "row", marginBottom: 26, padding: 15 },

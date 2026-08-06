@@ -1,3 +1,4 @@
+import { PayoutProviderLogo } from "@/components/payments/PayoutProviderLogo";
 import { AnimatedLoader, KasaButton, KasaCard, KasaStateView } from "@/components/ui";
 import { kasaColors, kasaLayout, kasaRadii, kasaSpacing } from "@/constants/design";
 import { apiService, type PayoutMethod, type PayoutProvider } from "@/services/apiService";
@@ -130,7 +131,7 @@ export default function PayoutMethodScreen() {
           <Ionicons color={kasaColors.text} name="arrow-back" size={21} />
         </Pressable>
         <Text style={styles.headerTitle}>Payout method</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerSpacer} />
       </View>
 
       {loading ? (
@@ -150,7 +151,7 @@ export default function PayoutMethodScreen() {
                 {current ? (
                   <KasaCard style={styles.currentCard}>
                     <View style={styles.currentTop}>
-                      <View style={styles.currentIcon}><Ionicons color={kasaColors.brand} name={current.type === "bank" ? "business-outline" : "phone-portrait-outline"} size={22} /></View>
+                      <View style={styles.currentIcon}><PayoutProviderLogo providerCode={current.providerCode} size={40} type={current.type} /></View>
                       <View style={styles.flex}>
                         <Text style={styles.currentLabel}>CURRENT PAYOUT METHOD</Text>
                         <Text style={styles.currentTitle}>{current.providerName} •••• {current.accountLast4}</Text>
@@ -176,7 +177,7 @@ export default function PayoutMethodScreen() {
 
                 <Text style={styles.label}>{type === "bank" ? "Bank" : "Mobile money network"}</Text>
                 <Pressable accessibilityRole="button" disabled={loadingProviders} onPress={() => setPickerVisible(true)} style={({ pressed }) => [styles.field, pressed && styles.pressed]}>
-                  <Ionicons color={kasaColors.textMuted} name={type === "bank" ? "business-outline" : "cellular-outline"} size={19} />
+                  <View style={styles.fieldProviderMark}><PayoutProviderLogo providerCode={provider?.code} size={34} type={type} /></View>
                   <Text style={[styles.fieldValue, !provider && styles.placeholder]}>{loadingProviders ? "Loading providers…" : provider?.name || `Choose ${type === "bank" ? "a bank" : "a network"}`}</Text>
                   <Ionicons color={kasaColors.textMuted} name="chevron-down" size={18} />
                 </Pressable>
@@ -200,7 +201,7 @@ export default function PayoutMethodScreen() {
         <SafeAreaView style={styles.pickerSafe}>
           <View style={styles.pickerHeader}><View><Text style={styles.pickerTitle}>Choose {type === "bank" ? "a bank" : "a network"}</Text><Text style={styles.pickerSubtitle}>{providers.length} available</Text></View><Pressable accessibilityLabel="Close provider list" accessibilityRole="button" onPress={() => setPickerVisible(false)} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}><Ionicons color={kasaColors.text} name="close" size={21} /></Pressable></View>
           {type === "bank" ? <View style={styles.searchBox}><Ionicons color={kasaColors.textMuted} name="search" size={18} /><TextInput autoCapitalize="none" onChangeText={setQuery} placeholder="Search banks" placeholderTextColor={kasaColors.textSubtle} style={styles.searchInput} value={query} /></View> : null}
-          <FlatList data={filteredProviders} keyExtractor={(item) => item.code} contentContainerStyle={styles.providerList} renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => { setProvider(item); setPickerVisible(false); setQuery(""); }} style={({ pressed }) => [styles.providerRow, pressed && styles.providerPressed]}><View style={styles.providerIcon}><Ionicons color={kasaColors.brand} name={type === "bank" ? "business-outline" : "cellular-outline"} size={19} /></View><Text style={styles.providerName}>{item.name}</Text>{provider?.code === item.code ? <Ionicons color={kasaColors.brand} name="checkmark-circle" size={21} /> : null}</Pressable>} />
+          <FlatList data={filteredProviders} keyExtractor={(item) => item.code} contentContainerStyle={styles.providerList} renderItem={({ item }) => <Pressable accessibilityLabel={item.name} accessibilityRole="button" onPress={() => { setProvider(item); setPickerVisible(false); setQuery(""); }} style={({ pressed }) => [styles.providerRow, pressed && styles.providerPressed]}><View style={styles.providerIcon}><PayoutProviderLogo providerCode={item.code} type={type} /></View><Text style={styles.providerName}>{item.name}</Text>{provider?.code === item.code ? <Ionicons color={kasaColors.brand} name="checkmark-circle" size={21} /> : null}</Pressable>} />
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -211,11 +212,13 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: kasaColors.background, flex: 1 }, flex: { flex: 1 }, center: { alignItems: "center", flex: 1, justifyContent: "center", paddingHorizontal: 24 },
   header: { alignItems: "center", borderBottomColor: kasaColors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", height: 60, justifyContent: "space-between", paddingHorizontal: 16 },
   headerButton: { alignItems: "center", borderRadius: 13, height: 44, justifyContent: "center", width: 44 }, headerTitle: { color: kasaColors.text, fontSize: 17, fontWeight: "800" }, pressed: { opacity: 0.68, transform: [{ scale: 0.98 }] },
+  headerSpacer: { height: 44, width: 44 },
   content: { paddingBottom: 44, paddingHorizontal: kasaLayout.screenInset, paddingTop: 20 }, intro: { color: kasaColors.textMuted, fontSize: 13, lineHeight: 20, marginBottom: 18 },
   currentCard: { padding: 15 }, currentTop: { alignItems: "center", flexDirection: "row" }, currentIcon: { alignItems: "center", backgroundColor: kasaColors.brandSoft, borderRadius: 13, height: 46, justifyContent: "center", marginRight: 12, width: 46 }, currentLabel: { color: kasaColors.textMuted, fontSize: 9, fontWeight: "800", letterSpacing: 0.7 }, currentTitle: { color: kasaColors.text, fontSize: 14, fontWeight: "800", marginTop: 4 }, currentName: { color: kasaColors.textMuted, fontSize: 11, marginTop: 3 }, readyBadge: { alignItems: "center", backgroundColor: "#E8F5EE", borderRadius: 10, flexDirection: "row", gap: 4, paddingHorizontal: 8, paddingVertical: 6 }, readyText: { color: kasaColors.success, fontSize: 9, fontWeight: "800" },
   emptyCard: { alignItems: "center", flexDirection: "row", gap: 12 }, emptyTitle: { color: kasaColors.text, fontSize: 13, fontWeight: "800" }, emptyText: { color: kasaColors.textMuted, fontSize: 10, marginTop: 3 },
   sectionTitle: { color: kasaColors.text, fontSize: 18, fontWeight: "800", marginBottom: 12, marginTop: 26 }, methodSwitch: { backgroundColor: kasaColors.surfaceMuted, borderRadius: kasaRadii.lg, flexDirection: "row", gap: 6, padding: 5 }, methodOption: { alignItems: "center", borderRadius: kasaRadii.md, flex: 1, flexDirection: "row", gap: 7, justifyContent: "center", minHeight: 48 }, methodOptionSelected: { backgroundColor: kasaColors.surface, borderColor: kasaColors.border, borderWidth: 1 }, methodText: { color: kasaColors.textMuted, fontSize: 11, fontWeight: "700" }, methodTextSelected: { color: kasaColors.brand, fontWeight: "800" },
   label: { color: kasaColors.text, fontSize: 12, fontWeight: "800", marginBottom: 8, marginTop: 20 }, field: { alignItems: "center", backgroundColor: kasaColors.surface, borderColor: kasaColors.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, minHeight: 56, paddingHorizontal: 14 }, fieldError: { borderColor: kasaColors.danger }, fieldValue: { color: kasaColors.text, flex: 1, fontSize: 13, fontWeight: "700" }, placeholder: { color: kasaColors.textSubtle, fontWeight: "500" }, input: { color: kasaColors.text, flex: 1, fontSize: 15, paddingVertical: 14 }, errorText: { color: kasaColors.danger, fontSize: 11, marginTop: 6 },
+  fieldProviderMark: { alignItems: "center", justifyContent: "center", minHeight: 34, width: 34 },
   safetyCard: { alignItems: "flex-start", flexDirection: "row", gap: 10, marginBottom: 20, marginTop: 22 }, safetyText: { color: kasaColors.textMuted, flex: 1, fontSize: 11, lineHeight: 17 },
   pickerSafe: { backgroundColor: kasaColors.background, flex: 1 }, pickerHeader: { alignItems: "center", borderBottomColor: kasaColors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", justifyContent: "space-between", padding: 20 }, pickerTitle: { color: kasaColors.text, fontSize: 20, fontWeight: "800" }, pickerSubtitle: { color: kasaColors.textMuted, fontSize: 11, marginTop: 3 }, closeButton: { alignItems: "center", backgroundColor: kasaColors.surface, borderColor: kasaColors.border, borderRadius: 13, borderWidth: 1, height: 44, justifyContent: "center", width: 44 },
   searchBox: { alignItems: "center", backgroundColor: kasaColors.surface, borderColor: kasaColors.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 9, margin: 16, paddingHorizontal: 13 }, searchInput: { color: kasaColors.text, flex: 1, fontSize: 14, minHeight: 48 }, providerList: { paddingBottom: kasaSpacing.xxl, paddingHorizontal: 16 }, providerRow: { alignItems: "center", borderBottomColor: kasaColors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", minHeight: 64 }, providerPressed: { opacity: 0.6 }, providerIcon: { alignItems: "center", backgroundColor: kasaColors.brandSoft, borderRadius: 11, height: 40, justifyContent: "center", marginRight: 12, width: 40 }, providerName: { color: kasaColors.text, flex: 1, fontSize: 13, fontWeight: "700" },

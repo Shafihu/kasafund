@@ -246,7 +246,7 @@ export default function MemberProfileScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Member profile</Text>
         {profile.isOwnProfile ? (
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         ) : (
           <TouchableOpacity
             accessibilityLabel="Member actions"
@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
   centered: { alignItems: "center", backgroundColor: COLORS.background, flex: 1, justifyContent: "center", padding: 28 },
   header: { alignItems: "center", backgroundColor: COLORS.background, flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
+  headerSpacer: { height: 42, width: 42 },
   headerTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 48, paddingHorizontal: 20 },
   hero: { alignItems: "center", paddingBottom: 26, paddingTop: 28 },

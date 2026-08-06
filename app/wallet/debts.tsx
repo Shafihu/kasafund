@@ -183,7 +183,7 @@ export default function GroupDebtsScreen() {
           <Ionicons color={kasaColors.text} name="arrow-back" size={22} />
         </Pressable>
         <Text style={styles.headerTitle}>Group debt</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerSpacer} />
       </View>
 
       {loading ? (
@@ -392,6 +392,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: kasaColors.background, flex: 1 },
   header: { alignItems: "center", borderBottomColor: kasaColors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", height: 58, justifyContent: "space-between", paddingHorizontal: 16 },
   headerButton: { alignItems: "center", borderRadius: 14, height: 44, justifyContent: "center", width: 44 },
+  headerSpacer: { height: 44, width: 44 },
   headerTitle: { color: kasaColors.text, fontSize: 17, fontWeight: "800" },
   pressed: { opacity: 0.58, transform: [{ scale: 0.96 }] },
   fullState: { flex: 1 },

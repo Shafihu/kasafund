@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { listPayoutProviders } from "../payoutProviderDirectoryService.js";
 
 const MOCK_NOTE =
   "Simulated transfer: Paystack live payouts are disabled and no real money was sent.";
@@ -34,17 +35,7 @@ export const mockTransferService = Object.freeze({
 
   async listProviders(type = "mobile_money") {
     await delay(400);
-    return type === "bank" ? [
-      { code: "GCB", name: "GCB Bank" },
-      { code: "ECOBANK", name: "Ecobank Ghana" },
-      { code: "FIDELITY", name: "Fidelity Bank Ghana" },
-      { code: "ABSA", name: "Absa Bank Ghana" },
-      { code: "STANBIC", name: "Stanbic Bank Ghana" },
-    ] : [
-      { code: "MTN", name: "MTN" },
-      { code: "ATL", name: "AirtelTigo" },
-      { code: "VOD", name: "Telecel" },
-    ];
+    return listPayoutProviders(type, { allowFallback: true });
   },
 
   async createRecipient({ name, accountNumber, providerCode }) {

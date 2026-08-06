@@ -114,7 +114,7 @@ export default function AccountStandingScreen() {
           <Ionicons name="arrow-back" size={21} color={C.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Account standing</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerSpacer} />
       </View>
 
       {loading ? (
@@ -298,6 +298,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: C.background, flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: C.surface, borderColor: C.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
+  headerSpacer: { height: 42, width: 42 },
   headerTitle: { color: C.text, fontSize: 17, fontWeight: "800" },
   loader: { alignItems: "center", flex: 1, justifyContent: "center" },
   content: { paddingBottom: 48, paddingHorizontal: 20 },

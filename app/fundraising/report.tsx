@@ -67,7 +67,7 @@ export default function ReportCampaignScreen() {
   return <SafeAreaView edges={["top"]} style={styles.safeArea}>
     <StatusBar barStyle="dark-content"/>
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.safeArea}>
-      <View style={styles.header}><Pressable accessibilityLabel="Go back" hitSlop={8} onPress={() => router.back()} style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}><Ionicons color={kasaColors.text} name="arrow-back" size={21}/></Pressable><Text style={styles.headerTitle}>Report campaign</Text><View style={styles.headerButton}/></View>
+      <View style={styles.header}><Pressable accessibilityLabel="Go back" hitSlop={8} onPress={() => router.back()} style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}><Ionicons color={kasaColors.text} name="arrow-back" size={21}/></Pressable><Text style={styles.headerTitle}>Report campaign</Text><View style={styles.headerSpacer}/></View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.notice}><View style={styles.noticeIcon}><Ionicons color={kasaColors.brand} name="shield-outline" size={22}/></View><View style={styles.noticeCopy}><Text style={styles.noticeTitle}>Confidential safety report</Text><Text style={styles.noticeText}>Tell us what concerns you about “{title || "this campaign"}”. Reporting does not automatically remove or penalize it.</Text></View></View>
         <Text style={styles.sectionTitle}>What concerns you?</Text>
@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: kasaColors.background, flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: kasaLayout.screenInset, paddingVertical: 12 },
   headerButton: { alignItems: "center", backgroundColor: kasaColors.surface, borderColor: kasaColors.border, borderRadius: kasaRadii.md, borderWidth: 1, height: 44, justifyContent: "center", width: 44 },
+  headerSpacer: { height: 44, width: 44 },
   headerTitle: { color: kasaColors.text, fontSize: 17, fontWeight: "800" },
   content: { paddingBottom: 42, paddingHorizontal: kasaLayout.screenInset },
   notice: { alignItems: "flex-start", backgroundColor: kasaColors.brandSoft, borderRadius: kasaRadii.lg, flexDirection: "row", marginBottom: kasaSpacing.xxl, padding: 15 },

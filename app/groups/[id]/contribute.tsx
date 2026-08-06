@@ -183,7 +183,7 @@ export default function ContributeGroupScreen() {
             <Ionicons name="arrow-back" size={22} color={COLORS.text} />
           </Pressable>
           <Text style={styles.headerTitle}>Make a contribution</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -349,6 +349,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 14,
   },
+  headerSpacer: { height: 44, width: 44 },
   pressed: { opacity: 0.58, transform: [{ scale: 0.96 }] },
   headerTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text },
   content: { padding: 20, paddingBottom: 30 },
