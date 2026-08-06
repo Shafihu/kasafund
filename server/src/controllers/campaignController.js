@@ -7,6 +7,10 @@ import { Notification } from "../models/Notification.js";
 import { User } from "../models/User.js";
 import { UserReport } from "../models/UserReport.js";
 import { audit, createShortCode, isHostedImageUrl, pagination, sendPage } from "../utils/api.js";
+import {
+  processCampaignLifecycles,
+  reconcileCampaignLifecycle,
+} from "../services/campaignLifecycleService.js";
 
 const categoryAliases = {
   education: "school_fees",
@@ -26,6 +30,9 @@ export async function createCampaign(req, res) {
   if (!isHostedImageUrl(coverImageUrl)) {
     return res.status(400).json({ success: false, message: "Campaign cover must be uploaded first" });
   }
+  if (!Number.isFinite(new Date(deadline).getTime()) || new Date(deadline).getTime() <= Date.now()) {
+    return res.status(400).json({ success: false, message: "Campaign deadline must be in the future" });
+  }
   const campaign = await Campaign.create({
     creatorId: req.user._id,
     title: title.trim(),
@@ -43,6 +50,7 @@ export async function createCampaign(req, res) {
 }
 
 export async function listCampaigns(req, res) {
+  await processCampaignLifecycles();
   const { page, limit, skip } = pagination(req.query);
   const filter = req.query.mine === "true"
     ? { creatorId: req.user._id }
@@ -70,6 +78,7 @@ export async function getCampaign(req, res) {
     : { shareSlug: req.params.id };
   const campaign = await Campaign.findOne(lookup).populate("creatorId", "fullName avatarUrl");
   if (!campaign) return res.status(404).json({ success: false, message: "Campaign not found" });
+  await reconcileCampaignLifecycle(campaign);
   if (campaign.status === "flagged" && String(campaign.creatorId._id) !== String(req.user._id)) {
     return res.status(403).json({ success: false, message: "This campaign is temporarily under review" });
   }
@@ -87,6 +96,7 @@ export async function getCampaign(req, res) {
 export async function updateCampaign(req, res) {
   const campaign = await Campaign.findOne({ _id: req.params.id, creatorId: req.user._id });
   if (!campaign) return res.status(404).json({ success: false, message: "Campaign not found" });
+  await reconcileCampaignLifecycle(campaign);
   if (req.body.title !== undefined && !String(req.body.title).trim()) {
     return res.status(400).json({ success: false, message: "Campaign title is required" });
   }
@@ -96,7 +106,15 @@ export async function updateCampaign(req, res) {
   if (req.body.coverImageUrl !== undefined && !isHostedImageUrl(req.body.coverImageUrl)) {
     return res.status(400).json({ success: false, message: "Campaign cover must be uploaded first" });
   }
-  const allowed = ["title", "description", "category", "coverImageUrl", "deadline", "isPublic", "allowAnonymousDonations", "status"];
+  if (req.body.deadline !== undefined) {
+    if (campaign.status !== "active") {
+      return res.status(409).json({ success: false, message: "An ended campaign's deadline cannot be changed" });
+    }
+    if (!Number.isFinite(new Date(req.body.deadline).getTime()) || new Date(req.body.deadline).getTime() <= Date.now()) {
+      return res.status(400).json({ success: false, message: "Campaign deadline must be in the future" });
+    }
+  }
+  const allowed = ["title", "description", "category", "coverImageUrl", "deadline", "isPublic", "allowAnonymousDonations"];
   for (const key of allowed) {
     if (req.body[key] !== undefined) {
       if (key === "category") campaign[key] = normalizeCategory(req.body[key]);

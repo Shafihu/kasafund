@@ -152,6 +152,15 @@ export default function CampaignDetailScreen() {
   const daysLeft = Math.max(0, Math.ceil((new Date(campaign.deadline).getTime() - Date.now()) / 86_400_000));
   const isOwner = currentUser?.id === campaign.creatorId._id;
   const canDonate = campaign.status === "active" && daysLeft > 0 && !isOwner;
+  const isCompleted = campaign.status === "completed";
+  const isClosed = campaign.status === "closed";
+  const finalActionLabel = isCompleted
+    ? "Goal reached"
+    : isClosed
+      ? "Campaign ended"
+      : campaign.status === "flagged"
+        ? "Campaign unavailable"
+        : "Campaign closed";
 
   const shareCampaign = async () => {
     const link = Linking.createURL(`/fundraising/${campaign.shareSlug}`);
@@ -247,6 +256,26 @@ export default function CampaignDetailScreen() {
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </Pressable>
 
+          {isCompleted || isClosed ? (
+            <View style={[styles.lifecycleNotice, isCompleted ? styles.completedNotice : styles.closedNotice]}>
+              <View style={[styles.lifecycleIcon, isCompleted ? styles.completedIcon : styles.closedIcon]}>
+                <Ionicons
+                  color={isCompleted ? COLORS.primary : COLORS.textMuted}
+                  name={isCompleted ? "checkmark-circle-outline" : "time-outline"}
+                  size={22}
+                />
+              </View>
+              <View style={styles.lifecycleCopy}>
+                <Text style={styles.lifecycleTitle}>{isCompleted ? "Fundraising goal reached" : "This campaign has ended"}</Text>
+                <Text style={styles.lifecycleText}>
+                  {isCompleted
+                    ? "The goal was achieved and this campaign is no longer accepting donations."
+                    : "The deadline passed. The story, updates, and supporter history remain available."}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.fundingCard}>
             <View style={styles.amountRow}>
               <View>
@@ -265,13 +294,13 @@ export default function CampaignDetailScreen() {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{daysLeft}</Text>
-                <Text style={styles.statLabel}>days left</Text>
+                <Text style={styles.statValue}>{isCompleted ? "Funded" : isClosed ? "Ended" : daysLeft}</Text>
+                <Text style={styles.statLabel}>{isCompleted ? "goal status" : isClosed ? "time status" : "days left"}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text numberOfLines={1} style={styles.statValue}>{money(remaining)}</Text>
-                <Text style={styles.statLabel}>still needed</Text>
+                <Text style={styles.statLabel}>{isCompleted ? "goal gap" : isClosed ? "short of goal" : "still needed"}</Text>
               </View>
             </View>
           </View>
@@ -367,8 +396,8 @@ export default function CampaignDetailScreen() {
         </TouchableOpacity>
         <KasaButton
           disabled={!isOwner && !canDonate}
-          label={isOwner ? "Manage campaign" : canDonate ? "Donate now" : "Campaign closed"}
-          leftIcon={<Ionicons name={isOwner ? "settings-outline" : "heart"} size={18} color={kasaColors.white} />}
+          label={isOwner ? "Manage campaign" : canDonate ? "Donate now" : finalActionLabel}
+          leftIcon={<Ionicons name={isOwner ? "settings-outline" : isCompleted ? "checkmark-circle-outline" : isClosed ? "time-outline" : "heart"} size={18} color={kasaColors.white} />}
           onPress={() => isOwner ? manageCampaign() : donate()}
           style={styles.donateButton}
         />
@@ -401,6 +430,15 @@ const styles = StyleSheet.create({
   organizerCopy: { flex: 1, marginLeft: 10 },
   organizerLabel: { color: COLORS.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 0.55 },
   organizerName: { color: COLORS.text, fontSize: 14, fontWeight: "700", marginTop: 3 },
+  lifecycleNotice: { alignItems: "flex-start", borderRadius: kasaRadii.lg, borderWidth: 1, flexDirection: "row", marginTop: kasaSpacing.lg, padding: 14 },
+  completedNotice: { backgroundColor: kasaColors.brandSoft, borderColor: "#CFE3DB" },
+  closedNotice: { backgroundColor: kasaColors.surfaceMuted, borderColor: COLORS.border },
+  lifecycleIcon: { alignItems: "center", borderRadius: 12, height: 42, justifyContent: "center", marginRight: 11, width: 42 },
+  completedIcon: { backgroundColor: COLORS.surface },
+  closedIcon: { backgroundColor: COLORS.surface },
+  lifecycleCopy: { flex: 1 },
+  lifecycleTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
+  lifecycleText: { color: COLORS.textMuted, fontSize: 11, lineHeight: 17, marginTop: 4 },
   avatarFallback: { alignItems: "center", backgroundColor: COLORS.primary, justifyContent: "center" },
   avatarInitial: { color: kasaColors.white, fontSize: 12, fontWeight: "800" },
   fundingCard: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: kasaRadii.lg, borderWidth: 1, marginTop: kasaSpacing.xl, padding: kasaSpacing.lg },

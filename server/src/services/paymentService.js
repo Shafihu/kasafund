@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Campaign } from "../models/Campaign.js";
+import { reconcileCampaignLifecycle } from "./campaignLifecycleService.js";
 import { Contribution } from "../models/Contribution.js";
 import { DebtPayment } from "../models/DebtPayment.js";
 import { Donation } from "../models/Donation.js";
@@ -316,9 +317,10 @@ export async function completeDonation(data) {
         { new: true, session }
       );
       if (!campaign) throw new Error("Campaign not found for donation");
-      if (campaign.raisedAmount >= campaign.goalAmount) {
-        await Campaign.updateOne({ _id: campaign._id }, { status: "completed" }, { session });
-      }
+      await reconcileCampaignLifecycle(campaign, {
+        now: data.paidAt || new Date(),
+        session,
+      });
       const creatorWantsDonationAlerts = await User.exists({
         _id: campaign.creatorId,
         "preferences.donationNotifications": { $ne: false },

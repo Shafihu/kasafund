@@ -21,6 +21,7 @@ import { startPayoutProcessor } from "./services/payoutProcessorService.js";
 import { startAutoContributionProcessor } from "./services/autoContributionService.js";
 import { startSavingsProcessor } from "./services/savingsProcessorService.js";
 import { configureChatSockets } from "./services/chatSocketService.js";
+import { startCampaignLifecycleProcessor } from "./services/campaignLifecycleService.js";
 
 const app = express();
 const port = env.port;
@@ -87,6 +88,7 @@ async function start() {
     startAutoContributionProcessor();
     startSavingsProcessor();
     startPayoutProcessor();
+    startCampaignLifecycleProcessor();
   });
 }
 

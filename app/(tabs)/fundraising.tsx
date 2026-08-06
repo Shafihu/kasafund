@@ -200,6 +200,10 @@ function CampaignCard({ campaign, onPress }: { campaign: Campaign; onPress: () =
           <Text style={styles.campaignCategory}>{campaign.category}</Text>
           {campaign.status === "flagged" ? (
             <KasaStatusBadge compact icon="flag-outline" label="Flagged" tone="danger" />
+          ) : campaign.status === "completed" ? (
+            <KasaStatusBadge compact icon="checkmark-circle-outline" label="Completed" tone="info" />
+          ) : campaign.status === "closed" ? (
+            <KasaStatusBadge compact icon="time-outline" label="Ended" tone="neutral" />
           ) : campaign.daysLeft <= 5 && (
             <View style={styles.daysLeftBadge}>
               <Text style={styles.daysLeftText}>{campaign.daysLeft}d left</Text>

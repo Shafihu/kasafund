@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 import { env } from "../config/env.js";
-import { Campaign } from "../models/Campaign.js";
+import { reconcileCampaignById } from "../services/campaignLifecycleService.js";
 import { Contribution } from "../models/Contribution.js";
 import { DebtPayment } from "../models/DebtPayment.js";
 import { Donation } from "../models/Donation.js";
@@ -851,13 +851,23 @@ export async function verifyContribution(req, res) {
 }
 
 export async function startDonation(req, res) {
-  const campaign = await Campaign.findOne({ _id: req.params.campaignId, status: "active" });
-  if (!campaign) return res.status(404).json({ success: false, message: "Active campaign not found" });
-  if (new Date(campaign.deadline).getTime() <= Date.now()) {
-    return res.status(400).json({ success: false, message: "This campaign has ended" });
-  }
   if (!validAmount(req.body.amount, 100)) {
     return res.status(400).json({ success: false, message: "Donation must be between GHS 1 and GHS 100,000" });
+  }
+  const campaign = await reconcileCampaignById(req.params.campaignId);
+  if (!campaign) return res.status(404).json({ success: false, message: "Campaign not found" });
+  if (campaign.status !== "active") {
+    return res.status(400).json({
+      success: false,
+      message: campaign.status === "completed" ? "This campaign has reached its goal" : "This campaign has ended",
+    });
+  }
+  const amountRemaining = campaign.goalAmount - campaign.raisedAmount;
+  if (req.body.amount > amountRemaining) {
+    return res.status(400).json({
+      success: false,
+      message: `Only GHS ${(amountRemaining / 100).toFixed(2)} remains to reach this campaign's goal`,
+    });
   }
   const paymentMethod = req.body.paymentMethod;
   if (!["mobile_money", "card", "wallet"].includes(paymentMethod)) {
